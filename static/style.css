@@ -412,3 +412,40 @@ input:focus, textarea:focus, select:focus {
 
 .chip.cuisine { font-style: italic; }
 .chip.cuisine.on { font-style: normal; }
+
+/* Aisle headings on the shopping list: they should read as signposts while
+   scanning one-handed, not compete with the items. */
+h2.aisle {
+    font-size: .78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--accent-dark);
+    margin: 1.2rem 0 .4rem;
+    padding-bottom: .3rem;
+    border-bottom: 1px solid var(--border);
+}
+h2.aisle:first-of-type { margin-top: .4rem; }
+h2.aisle .muted { text-transform: none; letter-spacing: 0; font-weight: 500; }
+
+/* --- recipe detail extras --- */
+.facts { display: flex; flex-wrap: wrap; gap: .5rem; margin: .5rem 0 1rem; }
+.fact {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: .45rem .7rem;
+    font-size: .85rem;
+    min-width: 5rem;
+}
+.fact b { display: block; font-size: 1.05rem; }
+.fact span { color: var(--muted); font-size: .75rem; }
+
+.allergens { color: var(--danger); font-weight: 600; }
+
+.step-photo {
+    max-width: 100%;
+    border-radius: 10px;
+    margin: .4rem 0;
+    display: block;
+}

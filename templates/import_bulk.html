@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Bulk Import{% endblock %}
+
+{% block content %}
+<h1>Bulk import</h1>
+
+<p class="muted">Two ways to fill your library quickly. Paste as many recipe
+   links as you like, or paste one <em>listing</em> page and it'll import every
+   recipe linked from it.</p>
+
+<form method="POST" class="card"
+      onsubmit="this.querySelector('button[type=submit]').disabled = true;
+                this.querySelector('button[type=submit]').textContent = 'Importing…'; return true;">
+    <div class="field">
+        <label for="urls">Recipe links, or one listing page</label>
+        <textarea id="urls" name="urls" rows="7" required
+                  placeholder="https://www.hellofresh.co.uk/recipes/most-popular-recipes&#10;&#10;…or several recipe links, one per line">{{ text }}</textarea>
+    </div>
+
+    <div class="field-row">
+        <div class="field">
+            <label for="limit">Stop after</label>
+            <input type="number" id="limit" name="limit" min="1" max="60" value="20">
+        </div>
+        <div class="field" style="display:flex;align-items:flex-end">
+            <button type="submit" class="btn block">Import</button>
+        </div>
+    </div>
+</form>
+
+<h2>Listing pages worth trying</h2>
+<ul class="muted">
+    <li><code>hellofresh.co.uk/recipes/most-popular-recipes</code></li>
+    <li><code>hellofresh.co.uk/recipes/quick-meals</code></li>
+    <li><code>hellofresh.co.uk/recipes/search?q=chicken</code></li>
+</ul>
+
+<p class="muted">
+    It waits a second between recipes, so a large import takes a while — roughly
+    a second each. Re-importing a recipe you already have refreshes it rather
+    than duplicating it.
+</p>
+{% endblock %}

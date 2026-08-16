@@ -570,3 +570,85 @@ def test_cuisine_survives_a_tag_filter_click(client):
                   tags=["Family Friendly"])
     body = client.get("/recipes?cuisine=Mexican").get_data(as_text=True)
     assert "cuisine=Mexican" in body and "tag=Family" in body
+
+
+def test_refresh_needed_when_nutrition_missing(client):
+    """A recipe saved before photos/nutrition existed should offer a refresh."""
+    import store
+    from db import get_db
+
+    with client.application.app_context():
+        conn = get_db()
+        store.save_recipe(conn, {
+            "name": "Old Import", "servings": 2, "cooking_time_mins": 30,
+            "source_url": "https://www.hellofresh.co.uk/recipes/x-abc",
+            "yields": {2: [{"quantity": 1, "unit": "", "name": "Thing",
+                            "is_pantry": False}]},
+            "instructions": [], "tags": ["Family Friendly"], "cuisines": ["Italian"],
+            "protein": "Veggie",
+        })
+        assert store.count_refreshable(conn) == 1
+
+
+def test_refresh_not_needed_once_complete(client):
+    import store
+    from db import get_db
+
+    with client.application.app_context():
+        conn = get_db()
+        store.save_recipe(conn, {
+            "name": "Complete", "servings": 2, "cooking_time_mins": 30,
+            "source_url": "https://www.hellofresh.co.uk/recipes/y-abc",
+            "yields": {2: [{"quantity": 1, "unit": "", "name": "Thing",
+                            "is_pantry": False}]},
+            "instructions": [], "tags": ["Family Friendly"], "cuisines": ["Italian"],
+            "protein": "Veggie",
+            "nutrition": [{"name": "Energy (kcal)", "amount": 700, "unit": "kcal"}],
+        })
+        assert store.count_refreshable(conn) == 0
+
+
+def test_step_photos_and_captions_survive_a_save(client):
+    import store
+    from db import get_db
+
+    with client.application.app_context():
+        conn = get_db()
+        rid = store.save_recipe(conn, {
+            "name": "Photo Recipe", "servings": 2, "cooking_time_mins": 30,
+            "yields": {2: [{"quantity": 1, "unit": "", "name": "Thing",
+                            "is_pantry": False}]},
+            "instructions": [
+                {"text": "Chop.", "image_url": "https://x/1.jpg", "caption": "Prep"},
+                {"text": "Cook.", "image_url": None, "caption": None},
+            ],
+        })
+        recipe = store.get_recipe(conn, rid)
+
+    assert recipe["instructions"][0]["image_url"] == "https://x/1.jpg"
+    assert recipe["instructions"][0]["caption"] == "Prep"
+    assert recipe["instructions"][1]["image_url"] is None
+
+
+def test_nutrition_allergens_utensils_round_trip(client):
+    import store
+    from db import get_db
+
+    with client.application.app_context():
+        conn = get_db()
+        rid = store.save_recipe(conn, {
+            "name": "Full", "servings": 2, "cooking_time_mins": 30,
+            "yields": {2: [{"quantity": 1, "unit": "", "name": "Thing",
+                            "is_pantry": False}]},
+            "instructions": [],
+            "nutrition": [{"name": "Protein", "amount": 42.5, "unit": "g"}],
+            "allergens": ["Fish", "Mustard"],
+            "utensils": ["Baking Tray", "Garlic Press"],
+        })
+        recipe = store.get_recipe(conn, rid)
+
+    assert recipe["nutrition"][0]["amount"] == 42.5
+    assert recipe["allergens"] == ["Fish", "Mustard"]
+    assert sorted(recipe["utensils"]) == ["Baking Tray", "Garlic Press"]
+    # Allergens and utensils must not leak into the library's filter chips.
+    assert all(t["kind"] in ("tag", "cuisine", "protein") for t in recipe["tags"])

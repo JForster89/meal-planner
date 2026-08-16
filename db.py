@@ -38,7 +38,9 @@ CREATE TABLE IF NOT EXISTS instructions (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
     recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
     step_no   INTEGER NOT NULL,
-    text      TEXT    NOT NULL
+    text      TEXT    NOT NULL,
+    image_url TEXT,
+    caption   TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_instructions_recipe ON instructions(recipe_id);
 
@@ -257,7 +259,7 @@ def ingredients_for(conn, recipe_id, portions):
         multiplier = portions / base if base else 1.0
 
     rows = conn.execute(
-        "SELECT quantity, unit, name, is_pantry FROM ingredients "
+        "SELECT quantity, unit, name, is_pantry, aisle FROM ingredients "
         "WHERE recipe_id = ? AND yields = ? ORDER BY position, id",
         (recipe_id, base),
     ).fetchall()
@@ -281,6 +283,10 @@ def init_db():
         # Columns added after the first release.
         ensure_column(conn, "recipes", "difficulty", "INTEGER")
         ensure_column(conn, "recipes", "image_url", "TEXT")
+        ensure_column(conn, "recipes", "nutrition", "TEXT")
+        ensure_column(conn, "instructions", "image_url", "TEXT")
+        ensure_column(conn, "instructions", "caption", "TEXT")
+        ensure_column(conn, "ingredients", "aisle", "TEXT")
         conn.commit()
         return migrated
     finally:

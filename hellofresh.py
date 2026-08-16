@@ -38,6 +38,26 @@ class ImportError_(Exception):
     """Raised when a URL cannot be turned into a recipe."""
 
 
+MEDIA_BASE = "https://media.hellofresh.com"
+
+
+def step_image_url(path, width=600):
+    """Turn a stored image path into a CDN URL at a sensible size.
+
+    Their media host takes transform parameters in the path, so asking for a
+    width keeps a step photo around 30 KB rather than full resolution.
+    """
+    if not path:
+        return None
+    path = path.strip()
+    if path.startswith("http"):
+        return path
+    return (
+        f"{MEDIA_BASE}/w_{width},q_auto,f_auto,c_limit,fl_lossy"
+        f"/hellofresh_s3{path if path.startswith('/') else '/' + path}"
+    )
+
+
 def is_hellofresh_url(url):
     return bool(re.match(r"^https?://(www\.)?hellofresh\.[a-z.]+/recipes/", url.strip(), re.I))
 
@@ -129,13 +149,39 @@ def _parse_next_data(html):
     if not yields:
         return None
 
-    steps = [
-        _clean_text(s.get("instructions"))
-        for s in sorted(recipe.get("steps", []), key=lambda s: s.get("index", 0))
-    ]
+    steps = []
+    for raw in sorted(recipe.get("steps", []), key=lambda s: s.get("index", 0)):
+        text = _clean_text(raw.get("instructions"))
+        if not text:
+            continue
+        images = raw.get("images") or []
+        first = images[0] if images else {}
+        steps.append({
+            "text": text,
+            "image_url": step_image_url(first.get("path")),
+            "caption": (first.get("caption") or "").strip() or None,
+        })
 
     ingredient_names = [
         i.get("name", "") for i in recipe.get("ingredients", []) if i.get("name")
+    ]
+
+    nutrition = [
+        {"name": n.get("name"), "amount": n.get("amount"), "unit": n.get("unit")}
+        for n in recipe.get("nutrition", []) or []
+        if n.get("name") and n.get("amount") is not None
+    ]
+
+    allergens = sorted({
+        a["name"].strip()
+        for a in (recipe.get("allergens") or [])
+        if isinstance(a, dict) and a.get("name")
+    })
+
+    utensils = [
+        u["name"].strip()
+        for u in (recipe.get("utensils") or [])
+        if isinstance(u, dict) and u.get("name")
     ]
 
     return {
@@ -143,7 +189,11 @@ def _parse_next_data(html):
         "cooking_time_mins": cooking_time,
         "servings": min(yields),
         "yields": yields,
-        "instructions": [s for s in steps if s],
+        "instructions": steps,
+        "nutrition": nutrition,
+        "allergens": allergens,
+        "utensils": utensils,
+        "image_url": step_image_url(recipe.get("imagePath"), width=800),
         "tags": taxonomy.clean_tags(recipe.get("tags")),
         "cuisines": [
             c["name"].strip()
@@ -208,7 +258,14 @@ def _parse_ld_json(html):
                 "cooking_time_mins": _minutes(item.get("totalTime")),
                 "servings": portions,
                 "yields": {portions: items},
-                "instructions": instructions,
+                "instructions": [
+                    {"text": t, "image_url": None, "caption": None}
+                    for t in instructions
+                ],
+                "nutrition": [],
+                "allergens": [],
+                "utensils": [],
+                "image_url": None,
                 "tags": [category] if isinstance(category, str) else list(category),
                 "cuisines": [cuisine] if isinstance(cuisine, str) else list(cuisine),
                 "protein": taxonomy.detect_protein([i["name"] for i in items]),
@@ -226,6 +283,73 @@ def parse(html):
             "their page layout — add the recipe manually for now."
         )
     return recipe
+
+
+# Listing pages render their cards client-side, so the recipe URLs are not in
+# href attributes - they sit in the embedded JSON as websiteUrl/canonicalLink.
+# Match both, since plain links do appear on some pages.
+_RECIPE_LINK = re.compile(
+    r'href="(/recipes/[a-z0-9-]+-[0-9a-f]{12,})"', re.I
+)
+_RECIPE_JSON_LINK = re.compile(
+    r'"(?:websiteUrl|canonicalLink)":"(https?://[^"]*?/recipes/[a-z0-9-]+-[0-9a-f]{12,})"',
+    re.I,
+)
+
+
+def is_listing_url(url):
+    """A HelloFresh page that lists recipes rather than being one."""
+    url = url.strip()
+    if not re.match(r"^https?://(www\.)?hellofresh\.[a-z.]+/", url, re.I):
+        return False
+    return not _is_recipe_path(url)
+
+
+def _is_recipe_path(url):
+    """A recipe page ends in a long hex id; a listing page doesn't."""
+    return bool(re.search(r"/recipes/[a-z0-9-]+-[0-9a-f]{12,}/?$", url.strip(), re.I))
+
+
+def find_recipe_links(html_text, base="https://www.hellofresh.co.uk"):
+    """Pull recipe URLs out of a category, search or collection page."""
+    seen, out = set(), []
+
+    def add(url):
+        # Compare on path so an href and its JSON twin don't both count.
+        key = re.sub(r"^https?://[^/]+", "", url).rstrip("/")
+        if key not in seen:
+            seen.add(key)
+            out.append(url)
+
+    for path in _RECIPE_LINK.findall(html_text):
+        add(base.rstrip("/") + path)
+    for url in _RECIPE_JSON_LINK.findall(html_text):
+        add(url)
+
+    return out
+
+
+def list_recipes_on(url):
+    """Fetch a listing page and return the recipe URLs it links to."""
+    url = url.strip()
+    if not re.match(r"^https?://(www\.)?hellofresh\.[a-z.]+/", url, re.I):
+        raise ImportError_(
+            "That doesn't look like a HelloFresh page. Try a URL starting "
+            "https://www.hellofresh.co.uk/"
+        )
+    try:
+        html_text = fetch(url)
+    except requests.RequestException as exc:
+        raise ImportError_(f"Couldn't reach HelloFresh: {exc}") from exc
+
+    base = re.match(r"^(https?://[^/]+)", url).group(1)
+    links = find_recipe_links(html_text, base)
+    if not links:
+        raise ImportError_(
+            "No recipe links found on that page. Use a category or search page, "
+            "for example hellofresh.co.uk/recipes/most-popular-recipes"
+        )
+    return links
 
 
 def import_recipe(url):

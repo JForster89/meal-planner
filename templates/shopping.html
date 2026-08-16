@@ -14,22 +14,27 @@
         <span class="muted" id="progress-text">{{ done }}/{{ total }}</span>
     </div>
 
-    <ul class="shopping-list">
-        {% for line in lines %}
-            <li class="{{ 'checked' if line.checked }}" data-key="{{ line.key }}">
-                <label class="item">
-                    <input type="checkbox" {{ 'checked' if line.checked }}
-                           data-key="{{ line.key }}">
-                    <span class="item-text">
-                        {%- if line.display_quantity %}<span class="item-qty">{{ line.display_quantity }}</span> {% endif -%}
-                        <span class="item-name">{{ line.name }}</span>
-                        {%- if line.is_pantry %} <span class="pill">cupboard</span>{% endif %}
-                        <span class="item-for">{{ line.recipes | join(', ') }}</span>
-                    </span>
-                </label>
-            </li>
-        {% endfor %}
+    {% for aisle_name, items in aisles.items() %}
+        {% if aisle_name %}<h2 class="aisle">{{ aisle_name }} <span class="muted">({{ items|length }})</span></h2>{% endif %}
+        <ul class="shopping-list">
+            {% for line in items %}
+                <li class="{{ 'checked' if line.checked }}" data-key="{{ line.key }}">
+                    <label class="item">
+                        <input type="checkbox" {{ 'checked' if line.checked }}
+                               data-key="{{ line.key }}">
+                        <span class="item-text">
+                            {%- if line.display_quantity %}<span class="item-qty">{{ line.display_quantity }}</span> {% endif -%}
+                            <span class="item-name">{{ line.name }}</span>
+                            {%- if line.is_pantry %} <span class="pill">cupboard</span>{% endif %}
+                            <span class="item-for">{{ line.recipes | join(', ') }}</span>
+                        </span>
+                    </label>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endfor %}
 
+    <ul class="shopping-list">
         {% for extra in extras %}
             <li class="{{ 'checked' if extra.checked }}" data-extra="{{ extra.id }}">
                 <label class="item">
@@ -52,8 +57,14 @@
 
     <div class="btn-row">
         <a class="btn secondary"
-           href="{{ url_for('shopping', pantry='0' if include_pantry else '1') }}">
+           href="{{ url_for('shopping', pantry='0' if include_pantry else '1',
+                            aisle='1' if by_aisle else '0') }}">
             {{ 'Hide' if include_pantry else 'Show' }} cupboard items
+        </a>
+        <a class="btn secondary"
+           href="{{ url_for('shopping', pantry='1' if include_pantry else '0',
+                            aisle='0' if by_aisle else '1') }}">
+            {{ 'One flat list' if by_aisle else 'Group by aisle' }}
         </a>
         <a class="btn secondary" href="{{ url_for('shopping_text', pantry='1' if include_pantry else '0') }}">
             Plain text

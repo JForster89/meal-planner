@@ -19,6 +19,7 @@
 
 <p class="muted">
     Importing the same URL again refreshes that recipe rather than duplicating it.
+    Several to add? Use <a href="{{ url_for('import_bulk') }}">bulk import</a>.
     Not a HelloFresh meal? <a href="{{ url_for('recipe_new') }}">Add it manually</a>.
 </p>
 {% endblock %}

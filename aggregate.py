@@ -157,6 +157,7 @@ def aggregate(rows, include_pantry=False):
                 "unit": canon_unit,
                 "quantity": scaled,
                 "is_pantry": bool(row["is_pantry"]),
+                "aisle": row.get("aisle") or "Other",
                 "recipes": [],
                 "unquantified": qty is None,
             }

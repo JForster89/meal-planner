@@ -45,6 +45,9 @@ def create_app():
         filled = store.backfill_proteins(get_db())
         if filled:
             app.logger.info("Derived a protein for %d existing recipe(s)", filled)
+        moved = store.resync_aisles(get_db())
+        if moved:
+            app.logger.info("Re-filed %d ingredient(s) into the right aisle", moved)
 
     register_routes(app)
     # Registered last so its before_request guard covers every route above.
@@ -175,6 +178,65 @@ def register_routes(app):
         return redirect(url_for("recipes"))
 
     # --- import -------------------------------------------------------------
+
+    @app.route("/import/bulk", methods=["GET", "POST"])
+    def import_bulk():
+        """Import many recipes: pasted URLs, or everything on a listing page."""
+        if request.method != "POST":
+            return render_template("import_bulk.html", text="")
+
+        text = request.form.get("urls", "").strip()
+        limit = min(max(request.form.get("limit", type=int) or 20, 1), 60)
+        conn = get_db()
+
+        candidates = [u.strip() for u in text.split() if u.strip()]
+        if not candidates:
+            flash("Paste at least one URL.", "error")
+            return render_template("import_bulk.html", text=text)
+
+        # A single listing URL means "import everything on this page".
+        urls = []
+        for candidate in candidates:
+            if hellofresh._is_recipe_path(candidate):
+                urls.append(candidate)
+            else:
+                try:
+                    urls.extend(hellofresh.list_recipes_on(candidate))
+                except hellofresh.ImportError_ as exc:
+                    flash(str(exc), "error")
+                    return render_template("import_bulk.html", text=text)
+
+        seen, ordered = set(), []
+        for url in urls:
+            if url not in seen:
+                seen.add(url)
+                ordered.append(url)
+        ordered = ordered[:limit]
+
+        added, updated, failed = 0, 0, []
+        for i, url in enumerate(ordered):
+            if i:
+                time.sleep(1)  # be a considerate visitor to their site
+            try:
+                data = hellofresh.import_recipe(url)
+            except hellofresh.ImportError_:
+                failed.append(url)
+                continue
+            existing = store.find_by_source_url(conn, data["source_url"])
+            store.save_recipe(conn, data, recipe_id=existing["id"] if existing else None)
+            if existing:
+                updated += 1
+            else:
+                added += 1
+
+        message = f"Imported {added} new recipe{'s' if added != 1 else ''}"
+        if updated:
+            message += f", refreshed {updated}"
+        message += f" from {len(ordered)} link{'s' if len(ordered) != 1 else ''}."
+        if failed:
+            message += f" {len(failed)} failed."
+        flash(message, "error" if failed and not (added or updated) else "success")
+        return redirect(url_for("recipes"))
 
     @app.route("/import", methods=["GET", "POST"])
     def import_recipe():
@@ -321,10 +383,13 @@ def register_routes(app):
         remaining = sum(1 for l in lines if not l["checked"]) + sum(
             1 for e in extras if not e["checked"]
         )
+        by_aisle = request.args.get("aisle", "1") != "0"
         return render_template(
             "shopping.html",
             plan=plan,
             lines=lines,
+            aisles=store.group_by_aisle(lines) if by_aisle else {"": lines},
+            by_aisle=by_aisle,
             extras=extras,
             include_pantry=include_pantry,
             remaining=remaining,

@@ -60,11 +60,40 @@
     <p class="muted">No ingredients recorded.</p>
 {% endif %}
 
+{% if recipe.utensils %}
+    <h2>You'll need</h2>
+    <p>{{ recipe.utensils | join(', ') }}</p>
+{% endif %}
+
+{% if recipe.nutrition %}
+    <h2>Per serving</h2>
+    <div class="facts">
+        {% for n in recipe.nutrition %}
+            {% if n.name != 'Energy (kJ)' %}
+                <div class="fact">
+                    <b>{{ n.amount }}{{ n.unit if n.unit != 'kcal' }}</b>
+                    <span>{{ 'Calories' if n.name == 'Energy (kcal)' else n.name }}</span>
+                </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+{% endif %}
+
+{% if recipe.allergens %}
+    <p class="allergens">Allergens: {{ recipe.allergens | join(', ') }}</p>
+{% endif %}
+
 {% if recipe.instructions %}
     <h2>Method</h2>
     <ol class="step-list">
         {% for step in recipe.instructions %}
-            <li>{{ step.text }}</li>
+            <li>
+                {{ step.text }}
+                {% if step.image_url %}
+                    <img class="step-photo" src="{{ step.image_url }}" loading="lazy"
+                         alt="{{ step.caption or 'Step ' ~ step.step_no }}">
+                {% endif %}
+            </li>
         {% endfor %}
     </ol>
 {% endif %}

@@ -220,7 +220,7 @@ h2{font-size:1rem;margin:1.5rem 0 .5rem;color:var(--muted)}
 
 SERVICE_WORKER = """// Cache the list so it opens in a supermarket dead spot.
 var CACHE = 'shopping-__STAMP__';
-var ASSETS = ['./', './index.html', './cook.html', './manifest.json', './icon.svg'];
+var ASSETS = ['./', './index.html', './cook.html', './manifest.json', './icon.svg'__EXTRA_ASSETS__];
 
 self.addEventListener('install', function (e) {
   self.skipWaiting();
@@ -328,7 +328,10 @@ main{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
       padding:1.1rem 1.2rem 1.5rem;overflow-y:auto;display:flex;flex-direction:column}
 .card-inner{max-width:660px;margin:0 auto;width:100%}
 .step-no{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
-         color:var(--accent-dark);margin-bottom:.5rem}
+         color:var(--accent-dark);margin-bottom:.3rem}
+.cap{font-size:1.05rem;font-weight:700;margin-bottom:.5rem}
+.shot{width:100%;max-height:38vh;object-fit:cover;border-radius:10px;margin-bottom:.7rem;
+      background:var(--border)}
 .step-text{font-size:1.22rem;line-height:1.55}
 @media (min-width:640px){ .step-text{font-size:1.3rem} }
 
@@ -583,10 +586,21 @@ def render_cook_decks(recipes):
 
         steps = recipe.get("steps", [])
         for i, step in enumerate(steps, start=1):
+            text = step if isinstance(step, str) else step.get("text", "")
+            photo, caption = "", ""
+            if not isinstance(step, str):
+                src = step.get("local_image")
+                if src:
+                    alt = html.escape(step.get("caption") or f"Step {i}", quote=True)
+                    photo = f'<img class="shot" src="{src}" alt="{alt}" loading="lazy">'
+                if step.get("caption"):
+                    caption = f'<div class="cap">{html.escape(step["caption"])}</div>'
+
             cards.append(
                 '<div class="card"><div class="card-inner">'
                 f'<div class="step-no">Step {i} of {len(steps)}</div>'
-                f'<div class="step-text">{html.escape(step)}</div>'
+                f"{caption}{photo}"
+                f'<div class="step-text">{html.escape(text)}</div>'
                 "</div></div>"
             )
 
@@ -657,17 +671,24 @@ def build_page(lines, generated_at=None, recipe_names=()):
     return PAGE.replace("__ITEMS__", render_items(lines)).replace("__META__", meta)
 
 
-def write_site(lines, recipe_names=(), out_dir=OUT_DIR, recipes=()):
+def write_site(lines, recipe_names=(), out_dir=OUT_DIR, recipes=(), with_images=True):
     """Write the shopping list, cook page and PWA plumbing into out_dir."""
     os.makedirs(out_dir, exist_ok=True)
     now = datetime.now()
     recipes = list(recipes)
 
+    images = download_images(recipes, out_dir) if with_images else []
+    # Precache the photos too, so a recipe opens in a kitchen with no signal
+    # even if you never viewed it online first.
+    extra_assets = "".join(f", './{IMG_DIR}/{n}'" for n in sorted(set(images)))
+
     files = {
         "index.html": build_page(lines, now, recipe_names),
         "cook.html": build_cook_page(recipes),
         # A changing cache name makes the service worker fetch the new list.
-        "sw.js": SERVICE_WORKER.replace("__STAMP__", now.strftime("%Y%m%d%H%M%S")),
+        "sw.js": (SERVICE_WORKER
+                  .replace("__STAMP__", now.strftime("%Y%m%d%H%M%S"))
+                  .replace("__EXTRA_ASSETS__", extra_assets)),
         "manifest.json": json.dumps(MANIFEST, indent=2),
         ".nojekyll": "",
     }
@@ -800,6 +821,58 @@ def pages_url(repo_dir=None):
     return f"https://{user.lower()}.github.io/{repo}/"
 
 
+IMG_DIR = "img"
+
+
+def download_images(recipes, out_dir, subdir=IMG_DIR):
+    """Fetch step photos into the site so the cook page works offline.
+
+    Hotlinking would be lighter, but the whole point of publishing a static
+    page is that it opens in a kitchen with no signal. Files are named by a
+    hash of their URL, so re-publishing an unchanged week downloads nothing.
+
+    Returns the list of local filenames written or already present.
+    """
+    import hashlib
+
+    import requests
+
+    target = os.path.join(out_dir, subdir)
+    os.makedirs(target, exist_ok=True)
+
+    local_names = []
+    for recipe in recipes:
+        for step in recipe.get("steps", []):
+            # Steps may be plain strings (manual recipes), which have no photo.
+            if isinstance(step, str):
+                continue
+            url = step.get("image_url")
+            if not url:
+                continue
+
+            name = hashlib.sha1(url.encode()).hexdigest()[:16] + ".jpg"
+            path = os.path.join(target, name)
+            step["local_image"] = f"./{subdir}/{name}"
+
+            if os.path.exists(path):
+                local_names.append(name)
+                continue
+
+            try:
+                resp = requests.get(url, timeout=30)
+                if resp.status_code == 200 and resp.content:
+                    with open(path, "wb") as fh:
+                        fh.write(resp.content)
+                    local_names.append(name)
+                else:
+                    step["local_image"] = None
+            except requests.RequestException:
+                # A missing photo is a cosmetic loss; never fail a publish for it.
+                step["local_image"] = None
+
+    return local_names
+
+
 def collect_planned_recipes(conn, plan_id):
     """Planned recipes with quantities resolved for the chosen portion count."""
     import store
@@ -827,7 +900,16 @@ def collect_planned_recipes(conn, plan_id):
             "portions": entry["portions"],
             "cooking_time_mins": recipe["cooking_time_mins"],
             "ingredients": ingredients,
-            "steps": [s["text"] for s in recipe["instructions"]],
+            "steps": [
+                {
+                    "text": s["text"],
+                    "image_url": s["image_url"] if "image_url" in s.keys() else None,
+                    "caption": s["caption"] if "caption" in s.keys() else None,
+                }
+                for s in recipe["instructions"]
+            ],
+            "utensils": recipe.get("utensils", []),
+            "allergens": recipe.get("allergens", []),
         })
     return out
 

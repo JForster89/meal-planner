@@ -8,6 +8,7 @@
 
 <div class="btn-row">
     <a class="btn" href="{{ url_for('import_recipe') }}">Import from HelloFresh</a>
+    <a class="btn secondary" href="{{ url_for('import_bulk') }}">Bulk import</a>
     <a class="btn secondary" href="{{ url_for('recipe_new') }}">Add manually</a>
     {% if untagged %}
         <form method="POST" action="{{ url_for('recipes_refresh_all') }}"

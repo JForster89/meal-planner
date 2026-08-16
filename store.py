@@ -1,5 +1,8 @@
 """Persistence for recipes, weekly plans and the shopping list."""
 
+import json
+
+import taxonomy
 from aggregate import aggregate
 from db import available_yields, ingredients_for, now_iso
 
@@ -43,7 +46,8 @@ def list_recipes(conn):
 
 def get_recipe(conn, recipe_id, portions=None):
     recipe = conn.execute(
-        "SELECT id, name, cooking_time_mins, servings, source_url, difficulty "
+        "SELECT id, name, cooking_time_mins, servings, source_url, difficulty, "
+        "       nutrition, image_url "
         "FROM recipes WHERE id = ?",
         (recipe_id,),
     ).fetchone()
@@ -53,9 +57,16 @@ def get_recipe(conn, recipe_id, portions=None):
     portions = portions or recipe["servings"]
     rows, multiplier = ingredients_for(conn, recipe_id, portions)
     instructions = conn.execute(
-        "SELECT step_no, text FROM instructions WHERE recipe_id = ? ORDER BY step_no",
+        "SELECT step_no, text, image_url, caption FROM instructions "
+        "WHERE recipe_id = ? ORDER BY step_no",
         (recipe_id,),
     ).fetchall()
+
+    tags = get_tags(conn, recipe_id)
+    try:
+        nutrition = json.loads(recipe["nutrition"]) if recipe["nutrition"] else []
+    except (ValueError, TypeError):
+        nutrition = []
 
     return {
         "id": recipe["id"],
@@ -69,7 +80,11 @@ def get_recipe(conn, recipe_id, portions=None):
         "available_yields": available_yields(conn, recipe_id),
         "ingredients": rows,
         "instructions": instructions,
-        "tags": get_tags(conn, recipe_id),
+        "tags": [t for t in tags if t["kind"] in ("tag", "cuisine", "protein")],
+        "allergens": [t["tag"] for t in tags if t["kind"] == "allergen"],
+        "utensils": [t["tag"] for t in tags if t["kind"] == "utensil"],
+        "nutrition": nutrition,
+        "image_url": recipe["image_url"],
     }
 
 
@@ -111,8 +126,8 @@ def save_recipe(conn, data, recipe_id=None):
                 continue
             conn.execute(
                 "INSERT INTO ingredients "
-                "(recipe_id, yields, quantity, unit, name, is_pantry, position) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "(recipe_id, yields, quantity, unit, name, is_pantry, position, aisle) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     recipe_id,
                     int(portions),
@@ -121,21 +136,45 @@ def save_recipe(conn, data, recipe_id=None):
                     ing["name"].strip(),
                     1 if ing.get("is_pantry") else 0,
                     ing.get("position", pos),
+                    # Stored rather than derived on read, so it can be corrected
+                    # per ingredient later without touching the rules.
+                    ing.get("aisle") or taxonomy.detect_aisle(ing["name"]),
                 ),
             )
 
-    for step, text in enumerate((t for t in data.get("instructions", []) if t.strip()), start=1):
+    # Steps arrive either as plain strings (manual entry, JSON-LD fallback) or
+    # as dicts carrying a photo and caption.
+    step_no = 0
+    for raw in data.get("instructions", []):
+        if isinstance(raw, str):
+            text, image_url, caption = raw, None, None
+        else:
+            text = raw.get("text", "")
+            image_url, caption = raw.get("image_url"), raw.get("caption")
+        if not text or not text.strip():
+            continue
+        step_no += 1
         conn.execute(
-            "INSERT INTO instructions (recipe_id, step_no, text) VALUES (?, ?, ?)",
-            (recipe_id, step, text.strip()),
+            "INSERT INTO instructions (recipe_id, step_no, text, image_url, caption) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (recipe_id, step_no, text.strip(), image_url, caption),
         )
 
-    conn.execute("UPDATE recipes SET difficulty = ? WHERE id = ?",
-                 (data.get("difficulty"), recipe_id))
+    conn.execute(
+        "UPDATE recipes SET difficulty = ?, nutrition = ?, image_url = ? WHERE id = ?",
+        (
+            data.get("difficulty"),
+            json.dumps(data["nutrition"]) if data.get("nutrition") else None,
+            data.get("image_url"),
+            recipe_id,
+        ),
+    )
 
     conn.execute("DELETE FROM recipe_tags WHERE recipe_id = ?", (recipe_id,))
     tagged = [("tag", t) for t in data.get("tags", [])]
     tagged += [("cuisine", c) for c in data.get("cuisines", [])]
+    tagged += [("allergen", a) for a in data.get("allergens", [])]
+    tagged += [("utensil", u) for u in data.get("utensils", [])]
     if data.get("protein"):
         tagged.append(("protein", data["protein"]))
     for kind, tag in tagged:
@@ -179,6 +218,27 @@ def backfill_proteins(conn):
     return len(rows)
 
 
+def resync_aisles(conn):
+    """Re-derive every ingredient's aisle from the current rules.
+
+    Aisles are stored rather than computed on read so they can eventually be
+    corrected by hand, but until that exists the stored value should track the
+    rules - otherwise improving them leaves old rows misfiled. Cheap: a few
+    hundred rows, and only rows that actually change are written.
+    """
+    rows = conn.execute("SELECT id, name, aisle FROM ingredients").fetchall()
+    changed = 0
+    for row in rows:
+        correct = taxonomy.detect_aisle(row["name"])
+        if row["aisle"] != correct:
+            conn.execute("UPDATE ingredients SET aisle = ? WHERE id = ?",
+                         (correct, row["id"]))
+            changed += 1
+    if changed:
+        conn.commit()
+    return changed
+
+
 def get_tags(conn, recipe_id):
     rows = conn.execute(
         "SELECT tag, kind FROM recipe_tags WHERE recipe_id = ? ORDER BY kind, tag",
@@ -204,16 +264,20 @@ def tags_for_recipes(conn, kinds=("tag", "cuisine", "protein")):
 
 
 def count_refreshable(conn):
-    """Imported recipes with no tags or cuisine yet.
+    """Imported recipes missing anything that only the HelloFresh page has.
 
-    Protein is backfilled locally, but tags and cuisine only exist on the
-    HelloFresh page, so these need re-fetching to be complete.
+    Protein is backfilled locally, but tags, cuisine, nutrition and step photos
+    only exist on the source page. A recipe saved before those were extracted
+    needs re-fetching to be complete.
     """
     row = conn.execute(
         "SELECT COUNT(*) AS n FROM recipes r "
         "WHERE r.source_url IS NOT NULL AND r.source_url != '' "
-        "  AND NOT EXISTS (SELECT 1 FROM recipe_tags t "
-        "                  WHERE t.recipe_id = r.id AND t.kind IN ('tag', 'cuisine'))"
+        "  AND ("
+        "    NOT EXISTS (SELECT 1 FROM recipe_tags t "
+        "                WHERE t.recipe_id = r.id AND t.kind IN ('tag', 'cuisine'))"
+        "    OR r.nutrition IS NULL"
+        "  )"
     ).fetchone()
     return row["n"] if row else 0
 
@@ -343,6 +407,9 @@ def build_shopping_list(conn, plan_id, include_pantry=False):
                     "unit": ing["unit"],
                     "name": ing["name"],
                     "is_pantry": ing["is_pantry"],
+                    # Older rows predate the column, so fall back to deriving it.
+                    "aisle": (ing["aisle"] if "aisle" in ing.keys() and ing["aisle"]
+                              else taxonomy.detect_aisle(ing["name"])),
                     "recipe_name": entry["name"],
                     "multiplier": multiplier,
                 }
@@ -364,6 +431,16 @@ def build_shopping_list(conn, plan_id, include_pantry=False):
     ).fetchall()
 
     return lines, extras
+
+
+def group_by_aisle(lines):
+    """Order the list the way you walk a shop, not alphabetically."""
+    grouped = {}
+    for line in lines:
+        grouped.setdefault(line.get("aisle") or "Other", []).append(line)
+    return dict(
+        sorted(grouped.items(), key=lambda kv: taxonomy.aisle_sort_key(kv[0]))
+    )
 
 
 def set_checked(conn, plan_id, item_key, checked):
