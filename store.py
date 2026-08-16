@@ -95,6 +95,99 @@ def find_by_source_url(conn, url):
     return conn.execute("SELECT id FROM recipes WHERE source_url = ?", (url,)).fetchone()
 
 
+def find_existing(conn, data):
+    """Locate an already-saved copy of an imported recipe.
+
+    Prefers HelloFresh's own recipe id, because the same dish is published at
+    several URLs and matching on the URL lets duplicates through.
+    """
+    canonical = data.get("canonical_id")
+    if canonical:
+        row = conn.execute(
+            "SELECT id FROM recipes WHERE canonical_id = ?", (canonical,)
+        ).fetchone()
+        if row:
+            return row
+    return find_by_source_url(conn, data.get("source_url"))
+
+
+def content_signature(conn, recipe_id):
+    """A fingerprint of what a recipe actually is, for spotting older duplicates.
+
+    Existing rows have no canonical id, and re-fetching every recipe to learn
+    it needs the network. Name plus the full ingredient list with quantities is
+    specific enough to identify a repeat without one.
+    """
+    row = conn.execute("SELECT name FROM recipes WHERE id = ?", (recipe_id,)).fetchone()
+    if not row:
+        return None
+    ingredients = conn.execute(
+        "SELECT name, quantity, unit, yields FROM ingredients "
+        "WHERE recipe_id = ? ORDER BY name, yields",
+        (recipe_id,),
+    ).fetchall()
+    parts = [row["name"].strip().lower()]
+    parts += [
+        f"{i['yields']}|{i['name'].strip().lower()}|{i['quantity']}|{(i['unit'] or '').lower()}"
+        for i in ingredients
+    ]
+    return "\n".join(parts)
+
+
+def find_duplicate_groups(conn):
+    """Groups of recipes that are the same dish, newest ids last."""
+    groups = {}
+    for row in conn.execute("SELECT id, canonical_id FROM recipes ORDER BY id"):
+        key = (
+            ("canon", row["canonical_id"]) if row["canonical_id"]
+            else ("sig", content_signature(conn, row["id"]))
+        )
+        if key[1]:
+            groups.setdefault(key, []).append(row["id"])
+    return [ids for ids in groups.values() if len(ids) > 1]
+
+
+def count_duplicates(conn):
+    """How many rows would be removed by merging."""
+    return sum(len(ids) - 1 for ids in find_duplicate_groups(conn))
+
+
+def merge_duplicates(conn):
+    """Collapse duplicate recipes, keeping one of each and preserving the plan.
+
+    The keeper is whichever copy is already in a plan, so a planned meal never
+    silently disappears; otherwise the earliest saved copy wins.
+    """
+    removed = 0
+    for ids in find_duplicate_groups(conn):
+        planned = {
+            r["recipe_id"] for r in conn.execute(
+                "SELECT DISTINCT recipe_id FROM plan_recipes WHERE recipe_id IN "
+                f"({','.join('?' * len(ids))})", ids
+            )
+        }
+        keeper = next((i for i in ids if i in planned), ids[0])
+
+        for other in ids:
+            if other == keeper:
+                continue
+            # Move any plan membership onto the keeper before deleting.
+            for entry in conn.execute(
+                "SELECT plan_id, portions FROM plan_recipes WHERE recipe_id = ?", (other,)
+            ).fetchall():
+                conn.execute(
+                    "INSERT INTO plan_recipes (plan_id, recipe_id, portions) "
+                    "VALUES (?, ?, ?) ON CONFLICT(plan_id, recipe_id) DO NOTHING",
+                    (entry["plan_id"], keeper, entry["portions"]),
+                )
+            conn.execute("DELETE FROM recipes WHERE id = ?", (other,))
+            removed += 1
+
+    if removed:
+        conn.commit()
+    return removed
+
+
 def save_recipe(conn, data, recipe_id=None):
     """Insert or fully replace a recipe and its ingredients/instructions.
 
@@ -162,11 +255,13 @@ def save_recipe(conn, data, recipe_id=None):
         )
 
     conn.execute(
-        "UPDATE recipes SET difficulty = ?, nutrition = ?, image_url = ? WHERE id = ?",
+        "UPDATE recipes SET difficulty = ?, nutrition = ?, image_url = ?, "
+        "                   canonical_id = ? WHERE id = ?",
         (
             data.get("difficulty"),
             json.dumps(data["nutrition"]) if data.get("nutrition") else None,
             data.get("image_url"),
+            data.get("canonical_id"),
             recipe_id,
         ),
     )

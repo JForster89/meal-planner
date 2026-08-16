@@ -10,6 +10,18 @@
     <a class="btn" href="{{ url_for('import_recipe') }}">Import from HelloFresh</a>
     <a class="btn secondary" href="{{ url_for('import_bulk') }}">Bulk import</a>
     <a class="btn secondary" href="{{ url_for('recipe_new') }}">Add manually</a>
+    {% if duplicates %}
+        <form method="POST" action="{{ url_for('recipes_dedupe') }}"
+              onsubmit="return confirm(
+                {{ ('Merge ' ~ duplicates ~ ' duplicate recipe(s)?\n\n' ~
+                    'HelloFresh publishes the same dish at several URLs. ' ~
+                    'Anything planned for this week is kept.') | tojson }});">
+            <button type="submit" class="btn secondary"
+                    title="Same dish imported more than once under different URLs">
+                ⧉ Merge {{ duplicates }} duplicate{{ 's' if duplicates != 1 }}
+            </button>
+        </form>
+    {% endif %}
     {% if untagged %}
         <form method="POST" action="{{ url_for('recipes_refresh_all') }}"
               onsubmit="this.querySelector('button').disabled = true;

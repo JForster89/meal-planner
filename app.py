@@ -121,6 +121,7 @@ def register_routes(app):
             q=query, active_tag=tag, active_protein=protein,
             active_cuisine=cuisine, group_by=group_by,
             untagged=store.count_refreshable(conn),
+            duplicates=store.count_duplicates(conn),
         )
 
     @app.route("/recipes/<int:recipe_id>")
@@ -227,7 +228,7 @@ def register_routes(app):
             except hellofresh.ImportError_:
                 failed.append(url)
                 continue
-            existing = store.find_by_source_url(conn, data["source_url"])
+            existing = store.find_existing(conn, data)
             store.save_recipe(conn, data, recipe_id=existing["id"] if existing else None)
             if existing:
                 updated += 1
@@ -254,7 +255,7 @@ def register_routes(app):
                 flash(str(exc), "error")
                 return render_template("import.html", url=url)
 
-            existing = store.find_by_source_url(conn, data["source_url"])
+            existing = store.find_existing(conn, data)
             recipe_id = store.save_recipe(
                 conn, data, recipe_id=existing["id"] if existing else None
             )
@@ -291,6 +292,21 @@ def register_routes(app):
         store.save_recipe(conn, data, recipe_id=recipe_id)
         flash(f"Refreshed “{data['name']}” from HelloFresh.", "success")
         return redirect(url_for("recipe_detail", recipe_id=recipe_id))
+
+    @app.route("/recipes/dedupe", methods=["POST"])
+    def recipes_dedupe():
+        """Collapse recipes that are the same dish under different URLs."""
+        conn = get_db()
+        removed = store.merge_duplicates(conn)
+        if removed:
+            flash(
+                f"Merged {removed} duplicate{'s' if removed != 1 else ''}. "
+                "HelloFresh publishes the same recipe at several URLs.",
+                "success",
+            )
+        else:
+            flash("No duplicates found.", "success")
+        return redirect(url_for("recipes"))
 
     @app.route("/recipes/refresh-all", methods=["POST"])
     def recipes_refresh_all():

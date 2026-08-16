@@ -208,6 +208,12 @@ def _parse_next_data(html):
         "allergens": allergens,
         "utensils": utensils,
         "image_url": step_image_url(recipe.get("imagePath"), width=800),
+        # Their recipe id is the real identity. The same dish is published at
+        # several URLs - "double-chorizo-crusted-baked-penne" and
+        # "chorizo-crusted-baked-penne" are aliases of one recipe - so keying
+        # on the URL lets duplicates in.
+        "canonical_id": (recipe.get("id") or "").strip() or None,
+        "canonical_url": (recipe.get("canonicalLink") or "").strip() or None,
         "tags": taxonomy.clean_tags(recipe.get("tags")),
         "cuisines": [
             c["name"].strip()
@@ -280,6 +286,8 @@ def _parse_ld_json(html):
                 "allergens": [],
                 "utensils": [],
                 "image_url": None,
+                "canonical_id": None,
+                "canonical_url": None,
                 "tags": [category] if isinstance(category, str) else list(category),
                 "cuisines": [cuisine] if isinstance(cuisine, str) else list(cuisine),
                 "protein": taxonomy.detect_protein([i["name"] for i in items]),

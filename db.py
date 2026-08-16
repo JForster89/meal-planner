@@ -284,6 +284,13 @@ def init_db():
         ensure_column(conn, "recipes", "difficulty", "INTEGER")
         ensure_column(conn, "recipes", "image_url", "TEXT")
         ensure_column(conn, "recipes", "nutrition", "TEXT")
+        # HelloFresh serves one recipe at many URL aliases, so the URL cannot
+        # identify it. Their own recipe id can.
+        ensure_column(conn, "recipes", "canonical_id", "TEXT")
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_recipes_canonical "
+            "ON recipes(canonical_id) WHERE canonical_id IS NOT NULL"
+        )
         ensure_column(conn, "instructions", "image_url", "TEXT")
         ensure_column(conn, "instructions", "caption", "TEXT")
         ensure_column(conn, "ingredients", "aisle", "TEXT")
