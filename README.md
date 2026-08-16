@@ -33,6 +33,35 @@ to put it somewhere else.
 venv/Scripts/python -m pytest tests/ -q
 ```
 
+## Desktop shortcut
+
+`scripts/` holds a launcher so you don't need a terminal:
+
+| Shortcut | What it does |
+|---|---|
+| **Meal Planner** | Starts the app if it isn't running, waits for it, opens the browser |
+| **Stop Meal Planner** | Stops it |
+
+It runs under `pythonw.exe`, so there's no console window — which is also why
+there's a separate Stop shortcut rather than "close the window".
+
+Starting takes a few seconds with nothing on screen, which invites an impatient
+second click. A mutex makes that harmless: while one launcher is still working,
+another exits instead of opening a second tab. Verified with three clicks from
+cold — one tab. Clicking again *after* it's up still opens the app, which is
+what you'd want.
+
+To recreate the shortcuts on another machine:
+
+```powershell
+$ws = New-Object -ComObject WScript.Shell
+$sc = $ws.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'Meal Planner.lnk'))
+$sc.TargetPath = "$env:SystemRoot\System32\wscript.exe"
+$sc.Arguments  = '"<repo>\scripts\start_planner.vbs"'
+$sc.IconLocation = '<repo>\static\icon.ico,0'
+$sc.Save()
+```
+
 ## Getting the list onto your phone (free)
 
 Planning happens on your PC, where the app can reach HelloFresh and hold the
