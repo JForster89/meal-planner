@@ -43,6 +43,14 @@ input[type=checkbox]{width:24px;height:24px;accent-color:var(--accent);flex:0 0 
 .for{display:block;font-size:.78rem;color:var(--muted)}
 li.done{opacity:.5}
 li.done .txt{text-decoration:line-through}
+/* Aisle signposts: readable while scanning one-handed, without competing
+   with the items themselves. */
+li.aisle-head{background:transparent;border:none;border-radius:0;margin:1.1rem 0 .35rem;
+  padding:0 .2rem .3rem;border-bottom:1px solid var(--border);
+  font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--accent-dark);display:flex;justify-content:space-between;align-items:baseline}
+li.aisle-head:first-child{margin-top:0}
+li.aisle-head .n{font-weight:500;color:var(--muted);letter-spacing:0}
 .pill{display:inline-block;font-size:.7rem;font-weight:700;text-transform:uppercase;
       letter-spacing:.03em;padding:.1rem .45rem;border-radius:999px;
       background:var(--accent-soft);color:var(--accent-dark);border:1px solid var(--border)}
@@ -69,26 +77,31 @@ h2{font-size:1rem;margin:1.5rem 0 .5rem;color:var(--muted)}
   </div>
 </header>
 <main>
-  <p class="meta">3 recipes &middot; updated Sun 16 Aug, 23:37</p>
-  <ul id="list"><li><label><input type="checkbox" data-key="avocado|"><span class="txt"><span class="qty">1</span> Avocado<span class="for">Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole</span></span></label></li>
-<li><label><input type="checkbox" data-key="beef stock paste|"><span class="txt"><span class="qty">15</span> Beef Stock Paste<span class="for">Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole</span></span></label></li>
+  <p class="meta">3 recipes &middot; updated Sun 16 Aug, 23:39</p>
+  <ul id="list"><li class="aisle-head">Fruit &amp; Veg<span class="n">7</span></li>
+<li><label><input type="checkbox" data-key="avocado|"><span class="txt"><span class="qty">1</span> Avocado<span class="for">Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole</span></span></label></li>
 <li><label><input type="checkbox" data-key="bell pepper|"><span class="txt"><span class="qty">2</span> Bell Pepper<span class="for">Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole</span></span></label></li>
-<li><label><input type="checkbox" data-key="british beef mince|"><span class="txt"><span class="qty">360</span> British Beef Mince<span class="for">Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole</span></span></label></li>
-<li><label><input type="checkbox" data-key="chicken stock powder|"><span class="txt"><span class="qty">4</span> Chicken Stock Powder<span class="for">Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span></span></label></li>
-<li><label><input type="checkbox" data-key="chorizo|"><span class="txt"><span class="qty">180</span> Chorizo<span class="for">Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span></span></label></li>
-<li><label><input type="checkbox" data-key="creme fraiche|"><span class="txt"><span class="qty">450</span> Creme Fraiche<span class="for">Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span></span></label></li>
-<li><label><input type="checkbox" data-key="dried thyme|"><span class="txt"><span class="qty">2</span> Dried Thyme<span class="for">Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span></span></label></li>
 <li><label><input type="checkbox" data-key="echalion shallot|"><span class="txt"><span class="qty">2</span> Echalion Shallot<span class="for">Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span></span></label></li>
-<li><label><input type="checkbox" data-key="finely chopped tomatoes|"><span class="txt"><span class="qty">1</span> Finely Chopped Tomatoes<span class="for">Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole</span></span></label></li>
 <li><label><input type="checkbox" data-key="garlic|"><span class="txt"><span class="qty">7</span> Garlic Clove<span class="for">Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole, Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span></span></label></li>
 <li><label><input type="checkbox" data-key="lime|"><span class="txt"><span class="qty">1</span> Lime<span class="for">Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole</span></span></label></li>
-<li><label><input type="checkbox" data-key="mature cheddar cheese|"><span class="txt"><span class="qty">225</span> Mature Cheddar Cheese<span class="for">Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole, Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span></span></label></li>
-<li><label><input type="checkbox" data-key="mexican style spice mix|"><span class="txt"><span class="qty">1</span> Mexican Style Spice Mix<span class="for">Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole</span></span></label></li>
-<li><label><input type="checkbox" data-key="panko breadcrumbs|"><span class="txt"><span class="qty">100</span> Panko Breadcrumbs<span class="for">Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span></span></label></li>
-<li><label><input type="checkbox" data-key="penne pasta|"><span class="txt"><span class="qty">600</span> Penne Pasta<span class="for">Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span></span></label></li>
-<li><label><input type="checkbox" data-key="plain flour|"><span class="txt"><span class="qty">48</span> Plain Flour<span class="for">Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span></span></label></li>
 <li><label><input type="checkbox" data-key="potato|"><span class="txt"><span class="qty">700</span> Potatoes<span class="for">Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole</span></span></label></li>
-<li><label><input type="checkbox" data-key="tenderstem® broccoli|"><span class="txt"><span class="qty">400</span> Tenderstem® Broccoli<span class="for">Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span></span></label></li></ul>
+<li><label><input type="checkbox" data-key="tenderstem® broccoli|"><span class="txt"><span class="qty">400</span> Tenderstem® Broccoli<span class="for">Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span></span></label></li>
+<li class="aisle-head">Meat &amp; Fish<span class="n">2</span></li>
+<li><label><input type="checkbox" data-key="british beef mince|"><span class="txt"><span class="qty">360</span> British Beef Mince<span class="for">Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole</span></span></label></li>
+<li><label><input type="checkbox" data-key="chorizo|"><span class="txt"><span class="qty">180</span> Chorizo<span class="for">Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span></span></label></li>
+<li class="aisle-head">Dairy &amp; Eggs<span class="n">2</span></li>
+<li><label><input type="checkbox" data-key="creme fraiche|"><span class="txt"><span class="qty">450</span> Creme Fraiche<span class="for">Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span></span></label></li>
+<li><label><input type="checkbox" data-key="mature cheddar cheese|"><span class="txt"><span class="qty">225</span> Mature Cheddar Cheese<span class="for">Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole, Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span></span></label></li>
+<li class="aisle-head">Bakery<span class="n">1</span></li>
+<li><label><input type="checkbox" data-key="panko breadcrumbs|"><span class="txt"><span class="qty">100</span> Panko Breadcrumbs<span class="for">Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span></span></label></li>
+<li class="aisle-head">Cupboard<span class="n">7</span></li>
+<li><label><input type="checkbox" data-key="beef stock paste|"><span class="txt"><span class="qty">15</span> Beef Stock Paste<span class="for">Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole</span></span></label></li>
+<li><label><input type="checkbox" data-key="chicken stock powder|"><span class="txt"><span class="qty">4</span> Chicken Stock Powder<span class="for">Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span></span></label></li>
+<li><label><input type="checkbox" data-key="dried thyme|"><span class="txt"><span class="qty">2</span> Dried Thyme<span class="for">Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span></span></label></li>
+<li><label><input type="checkbox" data-key="finely chopped tomatoes|"><span class="txt"><span class="qty">1</span> Finely Chopped Tomatoes<span class="for">Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole</span></span></label></li>
+<li><label><input type="checkbox" data-key="mexican style spice mix|"><span class="txt"><span class="qty">1</span> Mexican Style Spice Mix<span class="for">Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole</span></span></label></li>
+<li><label><input type="checkbox" data-key="penne pasta|"><span class="txt"><span class="qty">600</span> Penne Pasta<span class="for">Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span></span></label></li>
+<li><label><input type="checkbox" data-key="plain flour|"><span class="txt"><span class="qty">48</span> Plain Flour<span class="for">Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span></span></label></li></ul>
 
   <h2>Anything else</h2>
   <div class="add">
