@@ -58,6 +58,10 @@
         <a class="btn secondary" href="{{ url_for('shopping_text', pantry='1' if include_pantry else '0') }}">
             Plain text
         </a>
+        <form method="POST" action="{{ url_for('publish') }}">
+            <input type="hidden" name="pantry" value="{{ '1' if include_pantry else '0' }}">
+            <button type="submit" class="btn">Publish to phone</button>
+        </form>
         <form method="POST" action="{{ url_for('shopping_reset') }}"
               onsubmit="return confirm('Untick everything?')">
             <button type="submit" class="btn danger">Untick all</button>

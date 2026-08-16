@@ -250,6 +250,30 @@ def register_routes(app):
         flash("All items unticked.", "success")
         return redirect(url_for("shopping"))
 
+    @app.route("/publish", methods=["POST"])
+    def publish():
+        """Render the list into docs/ for GitHub Pages. Local use only."""
+        import export_static
+
+        conn = get_db()
+        plan = store.get_active_plan(conn)
+        include_pantry = request.form.get("pantry") == "1"
+        lines, _ = store.build_shopping_list(conn, plan["id"], include_pantry)
+        names = [e["name"] for e in store.plan_entries(conn, plan["id"])]
+
+        try:
+            export_static.write_site(lines, names)
+        except OSError as exc:
+            flash(f"Couldn't write the files: {exc}", "error")
+            return redirect(url_for("shopping"))
+
+        flash(
+            f"Published {len(lines)} items to docs/. "
+            "Commit and push to update your phone.",
+            "success",
+        )
+        return redirect(url_for("shopping"))
+
     @app.route("/shopping.txt")
     def shopping_text():
         conn = get_db()

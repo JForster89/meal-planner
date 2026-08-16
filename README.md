@@ -33,7 +33,28 @@ to put it somewhere else.
 venv/Scripts/python -m pytest tests/ -q
 ```
 
-## Deploying
+## Getting the list onto your phone (free)
+
+Planning happens on your PC, where the app can reach HelloFresh and hold the
+database. Only the shopping list needs to travel, so it's published as one
+static HTML file to GitHub Pages — no server, no hosting bill, and it keeps
+working in a supermarket dead spot.
+
+1. Plan the week in the local app.
+2. Hit **Publish to phone** on the shopping list (or run `python export_static.py`).
+   That writes `docs/`.
+3. `git add docs && git commit -m "shopping list" && git push`
+4. Open `https://<user>.github.io/<repo>/` on your phone, *Add to Home Screen*.
+
+Ticks are stored in the phone's `localStorage`, keyed by ingredient — so
+republishing after adding a recipe keeps everything you'd already ticked. A
+service worker caches the page, so it opens with no signal.
+
+The trade-offs, stated plainly: you must publish before leaving the house,
+ticks live on the phone and don't sync back, and GitHub's free plan only serves
+Pages from a **public** repository.
+
+## Deploying the full app (optional, paid)
 
 The shopping list is only useful if it works inside a supermarket, which means
 hosting it somewhere your phone can reach.
