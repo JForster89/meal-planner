@@ -357,3 +357,18 @@ def test_delete_confirm_warns_when_recipe_is_planned(client):
     client.post("/plan/add/1", data={"portions": 2})
     body = client.get("/recipes").get_data(as_text=True)
     assert "removed from it" in body
+
+
+def test_adding_a_deleted_recipe_does_not_500(client):
+    """A stale link or a re-submit after deleting hit a foreign key error."""
+    make_recipe(client)
+    client.post("/recipes/1/delete")
+
+    resp = client.post("/plan/add/1", data={"portions": 2})
+    assert resp.status_code == 302
+    body = client.get("/recipes").get_data(as_text=True)
+    assert "no longer exists" in body
+
+
+def test_adding_a_never_existing_recipe_does_not_500(client):
+    assert client.post("/plan/add/12345", data={"portions": 2}).status_code == 302

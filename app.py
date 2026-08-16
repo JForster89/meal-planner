@@ -198,6 +198,14 @@ def register_routes(app):
     @app.route("/plan/add/<int:recipe_id>", methods=["POST"])
     def plan_add(recipe_id):
         conn = get_db()
+        # A stale link or a re-submit after deleting would otherwise fail the
+        # foreign key and 500.
+        if not conn.execute(
+            "SELECT 1 FROM recipes WHERE id = ?", (recipe_id,)
+        ).fetchone():
+            flash("That recipe no longer exists.", "error")
+            return redirect(url_for("recipes"))
+
         plan = store.get_active_plan(conn)
         store.add_to_plan(conn, plan["id"], recipe_id, request.form.get("portions", type=int))
         return redirect(request.referrer or url_for("index"))
