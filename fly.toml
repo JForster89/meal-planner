@@ -1,5 +1,5 @@
-# Fly.io deployment. Rename `app` to something unique before first deploy.
-app = "hello-fresh-planner"
+# Fly.io deployment.
+app = "jf-meal-planner"
 primary_region = "lhr"
 
 [build]
