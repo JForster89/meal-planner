@@ -540,3 +540,33 @@ def test_refresh_all_button_hidden_once_tagged(client):
     with client.application.app_context():
         assert store.count_refreshable(get_db()) == 0
     assert "refresh-all" not in client.get("/recipes").get_data(as_text=True)
+
+
+def test_filter_by_cuisine(client):
+    tagged_recipe(client, "Beef Hash", "Beef", cuisines=["Mexican"])
+    tagged_recipe(client, "Penne", "Pork", cuisines=["Italian"])
+    body = client.get("/recipes?cuisine=Mexican").get_data(as_text=True)
+    assert "Beef Hash" in body
+    assert "Penne" not in body
+
+
+def test_cuisine_chips_are_offered(client):
+    tagged_recipe(client, "Beef Hash", "Beef", cuisines=["Mexican"])
+    body = client.get("/recipes").get_data(as_text=True)
+    assert "cuisine=Mexican" in body
+
+
+def test_cuisine_and_protein_filters_combine(client):
+    tagged_recipe(client, "Mexican Beef", "Beef", cuisines=["Mexican"])
+    tagged_recipe(client, "Mexican Pork", "Pork", cuisines=["Mexican"])
+    body = client.get("/recipes?cuisine=Mexican&protein=Pork").get_data(as_text=True)
+    assert "Mexican Pork" in body
+    assert "Mexican Beef" not in body
+
+
+def test_cuisine_survives_a_tag_filter_click(client):
+    """The other chips' links must preserve an active cuisine filter."""
+    tagged_recipe(client, "Mexican Beef", "Beef", cuisines=["Mexican"],
+                  tags=["Family Friendly"])
+    body = client.get("/recipes?cuisine=Mexican").get_data(as_text=True)
+    assert "cuisine=Mexican" in body and "tag=Family" in body

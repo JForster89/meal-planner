@@ -80,9 +80,12 @@ def register_routes(app):
         query = (request.args.get("q") or "").strip()
         tag = (request.args.get("tag") or "").strip()
         protein = (request.args.get("protein") or "").strip()
+        cuisine = (request.args.get("cuisine") or "").strip()
         group_by = request.args.get("group", "protein")
 
-        found = store.search_recipes(conn, query or None, tag or None, protein or None)
+        found = store.search_recipes(
+            conn, query or None, tag or None, protein or None, cuisine or None
+        )
         tags_by_recipe = store.tags_for_recipes(conn)
 
         # Group into an ordered mapping the template can just iterate.
@@ -105,8 +108,10 @@ def register_routes(app):
             planned=planned,
             tags_by_recipe=tags_by_recipe,
             proteins=store.all_tags(conn, "protein"),
+            cuisines=store.all_tags(conn, "cuisine"),
             tag_options=store.all_tags(conn, "tag"),
-            q=query, active_tag=tag, active_protein=protein, group_by=group_by,
+            q=query, active_tag=tag, active_protein=protein,
+            active_cuisine=cuisine, group_by=group_by,
             untagged=store.count_refreshable(conn),
         )
 

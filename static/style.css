@@ -409,3 +409,6 @@ input:focus, textarea:focus, select:focus {
     h1 { font-size: 1.8rem; }
     main { padding: 1.5rem 1rem 4rem; }
 }
+
+.chip.cuisine { font-style: italic; }
+.chip.cuisine.on { font-style: normal; }

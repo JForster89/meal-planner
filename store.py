@@ -227,7 +227,7 @@ def all_tags(conn, kind):
     return [{"tag": r["tag"], "count": r["n"]} for r in rows]
 
 
-def search_recipes(conn, query=None, tag=None, protein=None):
+def search_recipes(conn, query=None, tag=None, protein=None, cuisine=None):
     """Filter the library by free text and/or an exact tag.
 
     Free text matches the recipe name or any of its ingredient names, so
@@ -250,7 +250,7 @@ def search_recipes(conn, query=None, tag=None, protein=None):
         where.append("(r.name LIKE ? OR ing.name LIKE ?)")
         params += [f"%{query}%", f"%{query}%"]
 
-    for value, kind in ((tag, "tag"), (protein, "protein")):
+    for value, kind in ((tag, "tag"), (protein, "protein"), (cuisine, "cuisine")):
         if value:
             where.append(
                 "EXISTS (SELECT 1 FROM recipe_tags rt WHERE rt.recipe_id = r.id "

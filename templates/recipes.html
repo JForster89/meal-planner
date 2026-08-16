@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Recipes{% endblock %}
 
-{% macro filters_active() %}{{ q or active_tag or active_protein }}{% endmacro %}
+{% macro filters_active() %}{{ q or active_tag or active_protein or active_cuisine }}{% endmacro %}
 
 {% block content %}
 <h1>Recipes</h1>
@@ -29,18 +29,25 @@
         <button type="submit" class="btn">Search</button>
     </div>
 
-    {% if proteins or tag_options %}
+    {% if proteins or cuisines or tag_options %}
         <div class="chips">
             {% for p in proteins %}
                 <a class="chip {{ 'on' if p.tag == active_protein }}"
-                   href="{{ url_for('recipes', q=q, tag=active_tag, group=group_by,
+                   href="{{ url_for('recipes', q=q, tag=active_tag, cuisine=active_cuisine, group=group_by,
                                     protein='' if p.tag == active_protein else p.tag) }}">
                     {{ p.tag }} <span class="chip-n">{{ p.count }}</span>
                 </a>
             {% endfor %}
+            {% for c in cuisines %}
+                <a class="chip cuisine {{ 'on' if c.tag == active_cuisine }}"
+                   href="{{ url_for('recipes', q=q, tag=active_tag, protein=active_protein, group=group_by,
+                                    cuisine='' if c.tag == active_cuisine else c.tag) }}">
+                    {{ c.tag }} <span class="chip-n">{{ c.count }}</span>
+                </a>
+            {% endfor %}
             {% for t in tag_options %}
                 <a class="chip subtle {{ 'on' if t.tag == active_tag }}"
-                   href="{{ url_for('recipes', q=q, protein=active_protein, group=group_by,
+                   href="{{ url_for('recipes', q=q, protein=active_protein, cuisine=active_cuisine, group=group_by,
                                     tag='' if t.tag == active_tag else t.tag) }}">
                     {{ t.tag }} <span class="chip-n">{{ t.count }}</span>
                 </a>
@@ -56,7 +63,8 @@
         <span class="muted">Group by</span>
         {% for option in ['protein', 'cuisine', 'none'] %}
             <a class="chip {{ 'on' if option == group_by }}"
-               href="{{ url_for('recipes', q=q, tag=active_tag, protein=active_protein, group=option) }}">
+               href="{{ url_for('recipes', q=q, tag=active_tag, protein=active_protein,
+                                cuisine=active_cuisine, group=option) }}">
                 {{ option }}
             </a>
         {% endfor %}
