@@ -42,6 +42,12 @@
             <button type="submit" class="btn danger">Clear week</button>
         </form>
     </div>
+
+    {% if auth_enabled %}
+        <form method="POST" action="{{ url_for('logout') }}">
+            <button type="submit" class="btn secondary small">Sign out</button>
+        </form>
+    {% endif %}
 {% else %}
     <div class="empty">
         <h2>Nothing planned yet</h2>

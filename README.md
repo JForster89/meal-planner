@@ -41,14 +41,28 @@ hosting it somewhere your phone can reach.
 **Fly.io** (SQLite on a persistent volume, scales to zero between uses):
 
 ```bash
+fly auth login
 fly launch --no-deploy          # edit the app name in fly.toml first
-fly volumes create recipes_data --size 1
-fly secrets set SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+fly volumes create recipes_data --size 1 --region lhr
+fly secrets set SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')" \
+                APP_PASSWORD="whatever-you-want-to-type-on-your-phone"
 fly deploy
 ```
 
 Any Docker host works the same way — the only requirements are a persistent
-volume mounted at `/data` and a `SECRET_KEY`.
+volume mounted at `/data`, a `SECRET_KEY`, and an `APP_PASSWORD`.
+
+## Access control
+
+The whole app sits behind one shared password (`APP_PASSWORD`), because it holds
+your data and lives on a public URL. Signing in sets a 90-day cookie, so a phone
+stays signed in between shops.
+
+If `APP_PASSWORD` is unset the login is skipped entirely, which keeps local
+development frictionless. To stop that becoming a production footgun, the app
+**refuses to start** when it detects it's running on Fly without a password set.
+
+Repeated wrong passwords lock that client out for 5 minutes.
 
 Once deployed, open it on your phone and use "Add to Home Screen". The manifest
 makes it launch fullscreen, straight to the shopping list.

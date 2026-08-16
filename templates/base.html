@@ -16,14 +16,16 @@
 <header class="site-header">
     <div class="inner">
         <a class="brand" href="{{ url_for('index') }}">🥘 Meal Planner</a>
-        <nav>
-            <a href="{{ url_for('index') }}"
-               class="{{ 'active' if request.endpoint == 'index' }}">Week</a>
-            <a href="{{ url_for('recipes') }}"
-               class="{{ 'active' if request.endpoint in ('recipes', 'recipe_detail') }}">Recipes</a>
-            <a href="{{ url_for('shopping') }}"
-               class="{{ 'active' if request.endpoint == 'shopping' }}">Shop</a>
-        </nav>
+        {% if request.endpoint != 'login' %}
+            <nav>
+                <a href="{{ url_for('index') }}"
+                   class="{{ 'active' if request.endpoint == 'index' }}">Week</a>
+                <a href="{{ url_for('recipes') }}"
+                   class="{{ 'active' if request.endpoint in ('recipes', 'recipe_detail') }}">Recipes</a>
+                <a href="{{ url_for('shopping') }}"
+                   class="{{ 'active' if request.endpoint == 'shopping' }}">Shop</a>
+            </nav>
+        {% endif %}
     </div>
 </header>
 

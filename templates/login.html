@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Sign In{% endblock %}
+
+{% block content %}
+<div style="max-width: 380px; margin: 3rem auto;">
+    <h1 style="text-align:center">🥘 Meal Planner</h1>
+    <form method="POST" class="card">
+        <div class="field">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required autofocus
+                   autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn block">Sign in</button>
+    </form>
+    <p class="muted" style="text-align:center">You'll stay signed in on this device.</p>
+</div>
+{% endblock %}

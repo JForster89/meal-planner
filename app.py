@@ -9,6 +9,7 @@ from flask import (
 import hellofresh
 import store
 from aggregate import format_quantity
+from auth import init_auth
 from db import close_db, get_db, init_db
 
 
@@ -30,12 +31,19 @@ def create_app():
             return ""
         return str(int(qty)) if float(qty).is_integer() else f"{qty:g}"
 
+    @app.context_processor
+    def _template_globals():
+        from auth import auth_enabled
+        return {"auth_enabled": auth_enabled()}
+
     with app.app_context():
         migrated = init_db()
         if migrated:
             app.logger.info("Migrated %d recipe(s) from the legacy schema", migrated)
 
     register_routes(app)
+    # Registered last so its before_request guard covers every route above.
+    init_auth(app)
     return app
 
 
