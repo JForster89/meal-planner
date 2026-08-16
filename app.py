@@ -314,9 +314,19 @@ def register_routes(app):
             flash(f"Couldn't write the files: {exc}", "error")
             return redirect(url_for("shopping"))
 
+        built = f"{len(lines)} items and {len(recipes)} cook card{'s' if len(recipes) != 1 else ''}"
+
+        # Pushing is what actually gets it onto the phone, so do it here rather
+        # than leaving a git command as homework.
+        try:
+            status = export_static.git_publish()
+        except export_static.PublishError as exc:
+            flash(f"Built {built}, but couldn't publish: {exc}", "error")
+            return redirect(url_for("shopping"))
+
+        url = export_static.pages_url()
         flash(
-            f"Published {len(lines)} items and {len(recipes)} cook cards to docs/. "
-            "Commit and push to update your phone.",
+            f"Published {built}. {status}" + (f" {url}" if url else ""),
             "success",
         )
         return redirect(url_for("shopping"))

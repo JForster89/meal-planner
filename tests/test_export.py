@@ -123,6 +123,9 @@ def test_publish_route_writes_the_site(client, tmp_path, monkeypatch):
         lambda lines, names=(), out_dir=None, recipes=():
             original(lines, names, str(tmp_path), recipes),
     )
+    # Never let a test commit or push the real repository.
+    monkeypatch.setattr(export_static, "git_publish", lambda *a, **k: "stubbed")
+    monkeypatch.setattr(export_static, "pages_url", lambda *a, **k: None)
 
     with client.application.app_context():
         conn = get_db()
@@ -221,3 +224,160 @@ def test_service_worker_caches_the_cook_page(tmp_path):
 def test_shopping_page_links_to_cook_mode():
     from export_static import build_page
     assert './cook.html' in build_page([line("Potatoes")])
+
+
+# --- one-click publish ------------------------------------------------------
+
+def test_pages_url_derived_from_remote(tmp_path):
+    import subprocess
+    from export_static import pages_url
+
+    repo = str(tmp_path)
+    subprocess.run(["git", "init", "-q", repo], check=True)
+    subprocess.run(["git", "-C", repo, "remote", "add", "origin",
+                    "https://github.com/JForster89/meal-planner.git"], check=True)
+    assert pages_url(repo) == "https://jforster89.github.io/meal-planner/"
+
+
+def test_pages_url_handles_ssh_remote(tmp_path):
+    import subprocess
+    from export_static import pages_url
+
+    repo = str(tmp_path)
+    subprocess.run(["git", "init", "-q", repo], check=True)
+    subprocess.run(["git", "-C", repo, "remote", "add", "origin",
+                    "git@github.com:JForster89/meal-planner.git"], check=True)
+    assert pages_url(repo) == "https://jforster89.github.io/meal-planner/"
+
+
+def test_pages_url_none_without_remote(tmp_path):
+    import subprocess
+    from export_static import pages_url
+
+    repo = str(tmp_path)
+    subprocess.run(["git", "init", "-q", repo], check=True)
+    assert pages_url(repo) is None
+
+
+def test_publish_refuses_outside_a_repo(tmp_path):
+    from export_static import PublishError, git_publish
+    import pytest as _pytest
+
+    with _pytest.raises(PublishError, match="git repository"):
+        git_publish(repo_dir=str(tmp_path))
+
+
+def test_publish_refuses_without_a_remote(tmp_path):
+    import subprocess
+    from export_static import PublishError, git_publish
+    import pytest as _pytest
+
+    repo = str(tmp_path)
+    subprocess.run(["git", "init", "-q", repo], check=True)
+    os.makedirs(os.path.join(repo, "docs"), exist_ok=True)
+    with _pytest.raises(PublishError, match="origin"):
+        git_publish(repo_dir=repo)
+
+
+def test_publish_reports_when_nothing_changed(tmp_path):
+    """Republishing an unchanged list shouldn't make an empty commit."""
+    import subprocess
+    from export_static import git_publish
+
+    repo = str(tmp_path)
+    subprocess.run(["git", "init", "-q", repo], check=True)
+    subprocess.run(["git", "-C", repo, "remote", "add", "origin",
+                    "https://example.invalid/x.git"], check=True)
+    os.makedirs(os.path.join(repo, "docs"))
+    assert "No changes" in git_publish(repo_dir=repo)
+
+
+def test_publish_only_stages_docs(tmp_path):
+    """A half-finished code edit must not ride along with the shopping list."""
+    import subprocess
+    from export_static import PublishError, git_publish
+
+    repo = str(tmp_path)
+    subprocess.run(["git", "init", "-q", repo], check=True)
+    subprocess.run(["git", "-C", repo, "config", "user.email", "t@example.com"], check=True)
+    subprocess.run(["git", "-C", repo, "config", "user.name", "T"], check=True)
+    subprocess.run(["git", "-C", repo, "remote", "add", "origin",
+                    "https://example.invalid/x.git"], check=True)
+
+    os.makedirs(os.path.join(repo, "docs"))
+    with open(os.path.join(repo, "docs", "index.html"), "w") as fh:
+        fh.write("<p>list</p>")
+    with open(os.path.join(repo, "wip.py"), "w") as fh:
+        fh.write("broken = (")
+
+    # The push fails (the remote is bogus), but the commit should have happened.
+    try:
+        git_publish(repo_dir=repo)
+    except PublishError:
+        pass
+
+    committed = subprocess.run(
+        ["git", "-C", repo, "show", "--name-only", "--format=", "HEAD"],
+        capture_output=True, text=True,
+    ).stdout.split()
+    assert committed == ["docs/index.html"]
+    assert "wip.py" not in committed
+
+
+def test_publish_error_says_the_commit_is_safe(tmp_path):
+    import subprocess
+    from export_static import PublishError, git_publish
+    import pytest as _pytest
+
+    repo = str(tmp_path)
+    subprocess.run(["git", "init", "-q", repo], check=True)
+    subprocess.run(["git", "-C", repo, "config", "user.email", "t@example.com"], check=True)
+    subprocess.run(["git", "-C", repo, "config", "user.name", "T"], check=True)
+    subprocess.run(["git", "-C", repo, "remote", "add", "origin",
+                    "https://example.invalid/x.git"], check=True)
+    os.makedirs(os.path.join(repo, "docs"))
+    with open(os.path.join(repo, "docs", "index.html"), "w") as fh:
+        fh.write("<p>list</p>")
+
+    with _pytest.raises(PublishError, match="local commit is safe"):
+        git_publish(repo_dir=repo)
+
+
+def test_publish_route_reports_a_push_failure(client, tmp_path, monkeypatch):
+    """A failed push must say so, not claim the phone was updated."""
+    import export_static
+
+    original = export_static.write_site
+    monkeypatch.setattr(
+        export_static, "write_site",
+        lambda lines, names=(), out_dir=None, recipes=():
+            original(lines, names, str(tmp_path), recipes),
+    )
+
+    def boom(*a, **k):
+        raise export_static.PublishError("no network")
+    monkeypatch.setattr(export_static, "git_publish", boom)
+
+    resp = client.post("/publish", follow_redirects=True)
+    body = resp.get_data(as_text=True)
+    # Jinja escapes the apostrophe, so match either form.
+    assert "couldn&#39;t publish" in body or "couldn't publish" in body
+    assert "no network" in body
+    assert "flash error" in body
+
+
+def test_publish_route_reports_success_with_url(client, tmp_path, monkeypatch):
+    import export_static
+
+    original = export_static.write_site
+    monkeypatch.setattr(
+        export_static, "write_site",
+        lambda lines, names=(), out_dir=None, recipes=():
+            original(lines, names, str(tmp_path), recipes),
+    )
+    monkeypatch.setattr(export_static, "git_publish", lambda *a, **k: "Pushed.")
+    monkeypatch.setattr(export_static, "pages_url", lambda *a, **k: "https://x.github.io/y/")
+
+    body = client.post("/publish", follow_redirects=True).get_data(as_text=True)
+    assert "Pushed." in body
+    assert "https://x.github.io/y/" in body

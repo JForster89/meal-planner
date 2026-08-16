@@ -11,6 +11,7 @@ working in a supermarket dead spot.
 import html
 import json
 import os
+import re
 import sys
 from datetime import datetime
 
@@ -595,6 +596,83 @@ def write_site(lines, recipe_names=(), out_dir=OUT_DIR, recipes=()):
             fh.write(content)
 
     return os.path.join(out_dir, "index.html")
+
+
+class PublishError(Exception):
+    """Raised when the generated site couldn't be pushed."""
+
+
+def _git(args, cwd, timeout=90):
+    import subprocess
+
+    return subprocess.run(
+        ["git", *args], cwd=cwd, capture_output=True, text=True, timeout=timeout
+    )
+
+
+def git_publish(repo_dir=None, docs_dir="docs"):
+    """Commit and push just the generated site.
+
+    Scoped to `docs/` on purpose: publishing a shopping list shouldn't sweep up
+    whatever half-finished code edits happen to be in the working tree.
+
+    Returns a short status string, or raises PublishError.
+    """
+    import subprocess
+
+    repo_dir = repo_dir or os.path.dirname(os.path.abspath(__file__))
+
+    try:
+        inside = _git(["rev-parse", "--is-inside-work-tree"], repo_dir)
+        if inside.returncode != 0:
+            raise PublishError("This folder isn't a git repository.")
+
+        if _git(["remote", "get-url", "origin"], repo_dir).returncode != 0:
+            raise PublishError("No 'origin' remote is configured, so there's nowhere to push.")
+
+        add = _git(["add", "--", docs_dir], repo_dir)
+        if add.returncode != 0:
+            raise PublishError(f"git add failed: {add.stderr.strip()}")
+
+        staged = _git(["diff", "--cached", "--quiet", "--", docs_dir], repo_dir)
+        if staged.returncode == 0:
+            return "No changes since the last publish."
+
+        commit = _git(
+            ["commit", "-m", f"Shopping list {datetime.now():%d %b %H:%M}", "--", docs_dir],
+            repo_dir,
+        )
+        if commit.returncode != 0:
+            raise PublishError(f"git commit failed: {commit.stderr.strip() or commit.stdout.strip()}")
+
+        push = _git(["push"], repo_dir, timeout=120)
+        if push.returncode != 0:
+            detail = (push.stderr or push.stdout).strip().splitlines()
+            raise PublishError(
+                "Pushed nothing - " + (detail[-1] if detail else "git push failed") +
+                " (your local commit is safe; push by hand when you're back online)"
+            )
+
+        return "Pushed. Your phone updates in under a minute."
+
+    except FileNotFoundError as exc:
+        raise PublishError("git isn't installed or isn't on PATH.") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise PublishError("git timed out - check your connection.") from exc
+
+
+def pages_url(repo_dir=None):
+    """Best guess at the GitHub Pages address, from the origin remote."""
+    repo_dir = repo_dir or os.path.dirname(os.path.abspath(__file__))
+    result = _git(["remote", "get-url", "origin"], repo_dir, timeout=15)
+    if result.returncode != 0:
+        return None
+
+    match = re.search(r"github\.com[:/]([^/]+)/([^/\s.]+)", result.stdout.strip())
+    if not match:
+        return None
+    user, repo = match.groups()
+    return f"https://{user.lower()}.github.io/{repo}/"
 
 
 def collect_planned_recipes(conn, plan_id):
