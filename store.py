@@ -149,6 +149,36 @@ def save_recipe(conn, data, recipe_id=None):
     return recipe_id
 
 
+def backfill_proteins(conn):
+    """Give a protein to recipes saved before tagging existed.
+
+    The ingredients are already stored, so this needs no network call. Tags and
+    cuisine can't be recovered this way - those only come from HelloFresh - so
+    re-importing is still worthwhile, but grouping works immediately.
+    """
+    import taxonomy
+
+    rows = conn.execute(
+        "SELECT r.id FROM recipes r WHERE NOT EXISTS ("
+        "  SELECT 1 FROM recipe_tags t WHERE t.recipe_id = r.id AND t.kind = 'protein')"
+    ).fetchall()
+
+    for row in rows:
+        names = [
+            r["name"] for r in conn.execute(
+                "SELECT DISTINCT name FROM ingredients WHERE recipe_id = ?", (row["id"],)
+            )
+        ]
+        conn.execute(
+            "INSERT OR IGNORE INTO recipe_tags (recipe_id, tag, kind) VALUES (?, ?, 'protein')",
+            (row["id"], taxonomy.detect_protein(names)),
+        )
+
+    if rows:
+        conn.commit()
+    return len(rows)
+
+
 def get_tags(conn, recipe_id):
     rows = conn.execute(
         "SELECT tag, kind FROM recipe_tags WHERE recipe_id = ? ORDER BY kind, tag",

@@ -263,3 +263,35 @@ def test_tags_are_replaced_not_duplicated_on_reimport(client):
 
     names = {t["tag"] for t in tags}
     assert names == {"New Tag", "Beef"}
+
+
+def test_backfill_gives_old_recipes_a_protein(client):
+    """Recipes saved before tagging existed must still group, without re-import."""
+    import store
+    from db import get_db
+
+    with client.application.app_context():
+        conn = get_db()
+        recipe_id = store.save_recipe(conn, {
+            "name": "Legacy Beef Hash", "servings": 2, "cooking_time_mins": 45,
+            "yields": {2: [{"quantity": 400, "unit": "grams",
+                            "name": "Beef Mince", "is_pantry": False}]},
+            "instructions": [],
+        })
+        conn.execute("DELETE FROM recipe_tags WHERE recipe_id = ?", (recipe_id,))
+        conn.commit()
+        assert store.get_tags(conn, recipe_id) == []
+
+        assert store.backfill_proteins(conn) == 1
+        assert [t["tag"] for t in store.get_tags(conn, recipe_id)] == ["Beef"]
+
+
+def test_backfill_leaves_tagged_recipes_alone(client):
+    import store
+    from db import get_db
+
+    recipe_id = tagged_recipe(client, "Already Tagged", "Chicken")
+    with client.application.app_context():
+        conn = get_db()
+        assert store.backfill_proteins(conn) == 0
+        assert [t["tag"] for t in store.get_tags(conn, recipe_id)] == ["Chicken"]

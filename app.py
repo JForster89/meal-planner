@@ -40,6 +40,10 @@ def create_app():
         migrated = init_db()
         if migrated:
             app.logger.info("Migrated %d recipe(s) from the legacy schema", migrated)
+        # Recipes saved before tagging existed still group correctly.
+        filled = store.backfill_proteins(get_db())
+        if filled:
+            app.logger.info("Derived a protein for %d existing recipe(s)", filled)
 
     register_routes(app)
     # Registered last so its before_request guard covers every route above.
