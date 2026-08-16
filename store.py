@@ -203,6 +203,21 @@ def tags_for_recipes(conn, kinds=("tag", "cuisine", "protein")):
     return out
 
 
+def count_refreshable(conn):
+    """Imported recipes with no tags or cuisine yet.
+
+    Protein is backfilled locally, but tags and cuisine only exist on the
+    HelloFresh page, so these need re-fetching to be complete.
+    """
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM recipes r "
+        "WHERE r.source_url IS NOT NULL AND r.source_url != '' "
+        "  AND NOT EXISTS (SELECT 1 FROM recipe_tags t "
+        "                  WHERE t.recipe_id = r.id AND t.kind IN ('tag', 'cuisine'))"
+    ).fetchone()
+    return row["n"] if row else 0
+
+
 def all_tags(conn, kind):
     rows = conn.execute(
         "SELECT tag, COUNT(*) AS n FROM recipe_tags WHERE kind = ? "

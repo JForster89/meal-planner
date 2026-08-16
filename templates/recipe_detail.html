@@ -18,6 +18,11 @@
         <button type="submit" class="btn">+ Add to this week</button>
     </form>
     <a class="btn secondary" href="{{ url_for('recipe_edit', recipe_id=recipe.id) }}">Edit</a>
+    {% if recipe.source_url %}
+        <form method="POST" action="{{ url_for('recipe_refresh', recipe_id=recipe.id) }}">
+            <button type="submit" class="btn secondary">↻ Refresh from HelloFresh</button>
+        </form>
+    {% endif %}
     <form method="POST" action="{{ url_for('recipe_delete', recipe_id=recipe.id) }}"
           onsubmit="return confirm('Delete “{{ recipe.name }}”? This cannot be undone.')">
         <button type="submit" class="btn danger">Delete</button>

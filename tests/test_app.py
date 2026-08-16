@@ -372,3 +372,171 @@ def test_adding_a_deleted_recipe_does_not_500(client):
 
 def test_adding_a_never_existing_recipe_does_not_500(client):
     assert client.post("/plan/add/12345", data={"portions": 2}).status_code == 302
+
+
+# --- refreshing from HelloFresh ---------------------------------------------
+
+def test_refresh_updates_a_recipe_from_its_source(client, monkeypatch):
+    import hellofresh
+    import store
+    from db import get_db
+
+    with client.application.app_context():
+        conn = get_db()
+        recipe_id = store.save_recipe(conn, {
+            "name": "Old Name", "servings": 2, "cooking_time_mins": 20,
+            "source_url": "https://www.hellofresh.co.uk/recipes/thing-abc",
+            "yields": {2: [{"quantity": 1, "unit": "", "name": "Thing",
+                            "is_pantry": False}]},
+            "instructions": [], "protein": "Veggie",
+        })
+
+    monkeypatch.setattr(hellofresh, "import_recipe", lambda url: {
+        "name": "Fresh Name", "servings": 2, "cooking_time_mins": 35,
+        "source_url": url, "protein": "Chicken",
+        "tags": ["High Protein"], "cuisines": ["Indian"], "difficulty": 2,
+        "yields": {2: [{"quantity": 400, "unit": "grams", "name": "Chicken",
+                        "is_pantry": False}]},
+        "instructions": ["Cook it."],
+    })
+
+    assert client.post(f"/recipes/{recipe_id}/refresh").status_code == 302
+
+    with client.application.app_context():
+        conn = get_db()
+        recipe = store.get_recipe(conn, recipe_id)
+        tags = {t["tag"] for t in store.get_tags(conn, recipe_id)}
+    assert recipe["name"] == "Fresh Name"
+    assert recipe["cooking_time_mins"] == 35
+    assert tags == {"High Protein", "Indian", "Chicken"}
+
+
+def test_refresh_rejects_a_hand_written_recipe(client):
+    make_recipe(client)  # no source_url
+    body = client.post("/recipes/1/refresh", follow_redirects=True).get_data(as_text=True)
+    assert "added by hand" in body
+
+
+def test_refresh_reports_a_fetch_failure_without_wiping_the_recipe(client, monkeypatch):
+    import hellofresh
+    import store
+    from db import get_db
+
+    with client.application.app_context():
+        store.save_recipe(get_db(), {
+            "name": "Keep Me", "servings": 2, "cooking_time_mins": 20,
+            "source_url": "https://www.hellofresh.co.uk/recipes/thing-abc",
+            "yields": {2: [{"quantity": 1, "unit": "", "name": "Thing",
+                            "is_pantry": False}]},
+            "instructions": ["Step one."],
+        })
+
+    def boom(url):
+        raise hellofresh.ImportError_("site is down")
+    monkeypatch.setattr(hellofresh, "import_recipe", boom)
+
+    body = client.post("/recipes/1/refresh", follow_redirects=True).get_data(as_text=True)
+    assert "site is down" in body
+
+    with client.application.app_context():
+        recipe = store.get_recipe(get_db(), 1)
+    assert recipe["name"] == "Keep Me"
+    assert len(recipe["instructions"]) == 1
+
+
+def test_refresh_missing_recipe_is_404(client):
+    assert client.post("/recipes/999/refresh").status_code == 404
+
+
+def test_refresh_all_updates_every_imported_recipe(client, monkeypatch):
+    import hellofresh
+    import store
+    from db import get_db
+
+    with client.application.app_context():
+        conn = get_db()
+        for n in (1, 2):
+            store.save_recipe(conn, {
+                "name": f"Old {n}", "servings": 2, "cooking_time_mins": 20,
+                "source_url": f"https://www.hellofresh.co.uk/recipes/r{n}-abc",
+                "yields": {2: [{"quantity": 1, "unit": "", "name": "Thing",
+                                "is_pantry": False}]},
+                "instructions": [],
+            })
+
+    monkeypatch.setattr("app.time.sleep", lambda s: None)
+    monkeypatch.setattr(hellofresh, "import_recipe", lambda url: {
+        "name": "Refreshed", "servings": 2, "cooking_time_mins": 30,
+        "source_url": url, "protein": "Chicken", "tags": ["Family Friendly"],
+        "cuisines": ["Italian"], "difficulty": 1,
+        "yields": {2: [{"quantity": 1, "unit": "", "name": "Thing",
+                        "is_pantry": False}]},
+        "instructions": [],
+    })
+
+    body = client.post("/recipes/refresh-all", follow_redirects=True).get_data(as_text=True)
+    assert "Refreshed 2 recipes" in body
+
+
+def test_refresh_all_reports_partial_failure(client, monkeypatch):
+    import hellofresh
+    import store
+    from db import get_db
+
+    with client.application.app_context():
+        conn = get_db()
+        for n in (1, 2):
+            store.save_recipe(conn, {
+                "name": f"Recipe {n}", "servings": 2, "cooking_time_mins": 20,
+                "source_url": f"https://www.hellofresh.co.uk/recipes/r{n}-abc",
+                "yields": {2: [{"quantity": 1, "unit": "", "name": "Thing",
+                                "is_pantry": False}]},
+                "instructions": [],
+            })
+
+    monkeypatch.setattr("app.time.sleep", lambda s: None)
+
+    def flaky(url):
+        if url.endswith("r2-abc"):
+            raise hellofresh.ImportError_("timed out")
+        return {
+            "name": "Refreshed", "servings": 2, "cooking_time_mins": 30,
+            "source_url": url, "protein": "Chicken", "tags": [], "cuisines": [],
+            "difficulty": None,
+            "yields": {2: [{"quantity": 1, "unit": "", "name": "Thing",
+                            "is_pantry": False}]},
+            "instructions": [],
+        }
+    monkeypatch.setattr(hellofresh, "import_recipe", flaky)
+
+    body = client.post("/recipes/refresh-all", follow_redirects=True).get_data(as_text=True)
+    assert "Refreshed 1 recipe" in body
+    assert "Couldn" in body and "Recipe 2" in body
+
+
+def test_refresh_all_button_only_shows_when_something_needs_it(client):
+    import store
+    from db import get_db
+
+    with client.application.app_context():
+        conn = get_db()
+        store.save_recipe(conn, {
+            "name": "Untagged", "servings": 2, "cooking_time_mins": 20,
+            "source_url": "https://www.hellofresh.co.uk/recipes/x-abc",
+            "yields": {2: [{"quantity": 1, "unit": "", "name": "Thing",
+                            "is_pantry": False}]},
+            "instructions": [],
+        })
+        assert store.count_refreshable(conn) == 1
+
+    assert "refresh-all" in client.get("/recipes").get_data(as_text=True)
+
+
+def test_refresh_all_button_hidden_once_tagged(client):
+    import store
+    from db import get_db
+
+    tagged_recipe(client, "Tagged", "Chicken", tags=["Family Friendly"])
+    with client.application.app_context():
+        assert store.count_refreshable(get_db()) == 0
+    assert "refresh-all" not in client.get("/recipes").get_data(as_text=True)

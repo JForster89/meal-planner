@@ -1,6 +1,7 @@
 """Hello Fresh meal planner: pick a week's recipes, get one merged shopping list."""
 
 import os
+import time
 
 from flask import (
     Flask, Response, flash, g, jsonify, redirect, render_template, request, url_for
@@ -106,6 +107,7 @@ def register_routes(app):
             proteins=store.all_tags(conn, "protein"),
             tag_options=store.all_tags(conn, "tag"),
             q=query, active_tag=tag, active_protein=protein, group_by=group_by,
+            untagged=store.count_refreshable(conn),
         )
 
     @app.route("/recipes/<int:recipe_id>")
@@ -192,6 +194,62 @@ def register_routes(app):
             )
             return redirect(url_for("recipe_detail", recipe_id=recipe_id))
         return render_template("import.html", url="")
+
+    @app.route("/recipes/<int:recipe_id>/refresh", methods=["POST"])
+    def recipe_refresh(recipe_id):
+        """Re-fetch a recipe from its HelloFresh URL, picking up tags and cuisine."""
+        conn = get_db()
+        row = conn.execute(
+            "SELECT name, source_url FROM recipes WHERE id = ?", (recipe_id,)
+        ).fetchone()
+        if not row:
+            return render_template("404.html"), 404
+
+        if not row["source_url"]:
+            flash("That recipe was added by hand, so there's nothing to refresh from.",
+                  "error")
+            return redirect(url_for("recipe_detail", recipe_id=recipe_id))
+
+        try:
+            data = hellofresh.import_recipe(row["source_url"])
+        except hellofresh.ImportError_ as exc:
+            flash(f"Couldn't refresh “{row['name']}”: {exc}", "error")
+            return redirect(url_for("recipe_detail", recipe_id=recipe_id))
+
+        store.save_recipe(conn, data, recipe_id=recipe_id)
+        flash(f"Refreshed “{data['name']}” from HelloFresh.", "success")
+        return redirect(url_for("recipe_detail", recipe_id=recipe_id))
+
+    @app.route("/recipes/refresh-all", methods=["POST"])
+    def recipes_refresh_all():
+        """Refresh every imported recipe, so an older library gains its tags."""
+        conn = get_db()
+        rows = conn.execute(
+            "SELECT id, name, source_url FROM recipes "
+            "WHERE source_url IS NOT NULL AND source_url != '' ORDER BY id"
+        ).fetchall()
+
+        if not rows:
+            flash("No imported recipes to refresh.", "error")
+            return redirect(url_for("recipes"))
+
+        done, failed = 0, []
+        for i, row in enumerate(rows):
+            if i:
+                time.sleep(1)  # be a considerate visitor to their site
+            try:
+                data = hellofresh.import_recipe(row["source_url"])
+                store.save_recipe(conn, data, recipe_id=row["id"])
+                done += 1
+            except hellofresh.ImportError_:
+                failed.append(row["name"])
+
+        message = f"Refreshed {done} recipe{'s' if done != 1 else ''}."
+        if failed:
+            shown = ", ".join(f"“{n}”" for n in failed[:3])
+            message += f" Couldn't reach {len(failed)}: {shown}."
+        flash(message, "error" if failed else "success")
+        return redirect(url_for("recipes"))
 
     # --- weekly plan --------------------------------------------------------
 

@@ -9,6 +9,16 @@
 <div class="btn-row">
     <a class="btn" href="{{ url_for('import_recipe') }}">Import from HelloFresh</a>
     <a class="btn secondary" href="{{ url_for('recipe_new') }}">Add manually</a>
+    {% if untagged %}
+        <form method="POST" action="{{ url_for('recipes_refresh_all') }}"
+              onsubmit="this.querySelector('button').disabled = true;
+                        this.querySelector('button').textContent = 'Refreshing…'; return true;">
+            <button type="submit" class="btn secondary"
+                    title="Fetches tags and cuisine for recipes imported before tagging existed">
+                ↻ Refresh {{ untagged }} from HelloFresh
+            </button>
+        </form>
+    {% endif %}
 </div>
 
 <form method="GET" class="card filter-card">
