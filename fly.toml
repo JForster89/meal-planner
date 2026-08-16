@@ -15,12 +15,10 @@ primary_region = "lhr"
   # Scaling to zero is fine for one user: it wakes on the first request.
   min_machines_running = 0
 
-  [[http_service.checks]]
-    grace_period = "10s"
-    interval = "30s"
-    method = "GET"
-    timeout = "5s"
-    path = "/healthz"
+  # Deliberately no [[http_service.checks]]. A periodic health check counts as
+  # traffic, so it holds the machine awake and bills runtime around the clock -
+  # verified: the machine stayed "started" through three idle minutes with one
+  # configured. /healthz still exists for checking by hand.
 
 [[mounts]]
   source = "recipes_data"
