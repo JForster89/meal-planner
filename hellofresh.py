@@ -58,6 +58,20 @@ def step_image_url(path, width=600):
     )
 
 
+_WIDTH_PARAM = re.compile(r"/w_\d+,")
+
+
+def resize_image_url(url, width):
+    """Ask their CDN for a different size of an image we already have a URL for.
+
+    A list thumbnail doesn't need the 800px version, and the transform lives
+    in the path, so this is a rewrite rather than another lookup.
+    """
+    if not url:
+        return None
+    return _WIDTH_PARAM.sub(f"/w_{int(width)},", url, count=1)
+
+
 def is_hellofresh_url(url):
     return bool(re.match(r"^https?://(www\.)?hellofresh\.[a-z.]+/recipes/", url.strip(), re.I))
 

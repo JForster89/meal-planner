@@ -652,3 +652,47 @@ def test_nutrition_allergens_utensils_round_trip(client):
     assert sorted(recipe["utensils"]) == ["Baking Tray", "Garlic Press"]
     # Allergens and utensils must not leak into the library's filter chips.
     assert all(t["kind"] in ("tag", "cuisine", "protein") for t in recipe["tags"])
+
+
+# --- dish photos ------------------------------------------------------------
+
+def test_recipe_list_shows_a_thumbnail(client):
+    import store
+    from db import get_db
+
+    with client.application.app_context():
+        store.save_recipe(get_db(), {
+            "name": "Pretty Dish", "servings": 2, "cooking_time_mins": 30,
+            "image_url": "https://media.hellofresh.com/w_800,q_auto/hellofresh_s3/image/x.jpg",
+            "yields": {2: [{"quantity": 1, "unit": "", "name": "Thing",
+                            "is_pantry": False}]},
+            "instructions": [],
+        })
+
+    body = client.get("/recipes").get_data(as_text=True)
+    assert 'class="thumb"' in body
+    # Asks the CDN for a list-sized image, not the full 800px one.
+    assert "w_200," in body
+
+
+def test_recipe_page_shows_a_hero_image(client):
+    import store
+    from db import get_db
+
+    with client.application.app_context():
+        store.save_recipe(get_db(), {
+            "name": "Pretty Dish", "servings": 2, "cooking_time_mins": 30,
+            "image_url": "https://media.hellofresh.com/w_800,q_auto/hellofresh_s3/image/x.jpg",
+            "yields": {2: [{"quantity": 1, "unit": "", "name": "Thing",
+                            "is_pantry": False}]},
+            "instructions": [],
+        })
+
+    assert 'class="hero"' in client.get("/recipes/1").get_data(as_text=True)
+
+
+def test_recipe_without_a_photo_gets_a_placeholder(client):
+    make_recipe(client)  # no image_url
+    body = client.get("/recipes").get_data(as_text=True)
+    assert "thumb-blank" in body
+    assert "<img src=" not in body.split('class="thumb"')[1][:200]

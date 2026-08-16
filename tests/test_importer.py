@@ -223,3 +223,24 @@ def test_listing_ignores_non_recipe_links():
 ])
 def test_recipe_versus_listing_url(url, is_recipe):
     assert hellofresh._is_recipe_path(url) is is_recipe
+
+
+@pytest.mark.parametrize("width,expected", [
+    (200, "/w_200,"),
+    (800, "/w_800,"),
+])
+def test_resize_rewrites_the_width(width, expected):
+    url = "https://media.hellofresh.com/w_800,q_auto,f_auto/hellofresh_s3/image/x.jpg"
+    out = hellofresh.resize_image_url(url, width)
+    assert expected in out
+    assert out.endswith("/hellofresh_s3/image/x.jpg")
+
+
+def test_resize_only_touches_the_first_width():
+    url = "https://media.hellofresh.com/w_800,q_auto/hellofresh_s3/w_800/x.jpg"
+    assert hellofresh.resize_image_url(url, 200).count("/w_200,") == 1
+
+
+def test_resize_handles_missing_url():
+    assert hellofresh.resize_image_url(None, 200) is None
+    assert hellofresh.resize_image_url("", 200) is None

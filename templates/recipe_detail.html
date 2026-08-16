@@ -2,6 +2,10 @@
 {% block title %}{{ recipe.name }}{% endblock %}
 
 {% block content %}
+{% if recipe.image_url %}
+    <img class="hero" src="{{ recipe.image_url | thumb(800) }}" alt="{{ recipe.name }}">
+{% endif %}
+
 <h1>{{ recipe.name }}</h1>
 
 <p class="muted">

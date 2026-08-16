@@ -32,6 +32,11 @@ def create_app():
             return ""
         return str(int(qty)) if float(qty).is_integer() else f"{qty:g}"
 
+    @app.template_filter("thumb")
+    def _thumb(url, width=200):
+        """A list-sized version of a dish photo, rather than the 800px one."""
+        return hellofresh.resize_image_url(url, width) or ""
+
     @app.context_processor
     def _template_globals():
         from auth import auth_enabled

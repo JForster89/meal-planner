@@ -38,6 +38,7 @@ def default_portions(conn):
 def list_recipes(conn):
     return conn.execute(
         "SELECT r.id, r.name, r.cooking_time_mins, r.servings, r.source_url, "
+        "       r.image_url, "
         "       (SELECT COUNT(*) FROM ingredients i "
         "         WHERE i.recipe_id = r.id AND i.yields = r.servings) AS n_ingredients "
         "FROM recipes r ORDER BY r.name COLLATE NOCASE"
@@ -299,7 +300,7 @@ def search_recipes(conn, query=None, tag=None, protein=None, cuisine=None):
     """
     sql = [
         "SELECT DISTINCT r.id, r.name, r.cooking_time_mins, r.servings, r.source_url,",
-        "  r.difficulty,",
+        "  r.difficulty, r.image_url,",
         "  (SELECT COUNT(*) FROM ingredients i",
         "    WHERE i.recipe_id = r.id AND i.yields = r.servings) AS n_ingredients",
         "FROM recipes r",

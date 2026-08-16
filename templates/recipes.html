@@ -83,6 +83,14 @@
         {% for recipe in items %}
             <div class="card">
                 <div class="card-row">
+                    <a class="thumb" href="{{ url_for('recipe_detail', recipe_id=recipe.id) }}"
+                       aria-hidden="true" tabindex="-1">
+                        {% if recipe.image_url %}
+                            <img src="{{ recipe.image_url | thumb(200) }}" alt="" loading="lazy">
+                        {% else %}
+                            <span class="thumb-blank">🍽</span>
+                        {% endif %}
+                    </a>
                     <div class="grow">
                         <h3><a href="{{ url_for('recipe_detail', recipe_id=recipe.id) }}">{{ recipe.name }}</a></h3>
                         <span class="muted">
