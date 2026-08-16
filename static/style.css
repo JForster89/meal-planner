@@ -215,6 +215,37 @@ input:focus, textarea:focus, select:focus {
 
 .icon-btn:hover { background: var(--danger); color: #fff; }
 
+/* Destructive action sitting beside the primary one, so it stays quiet until
+   deliberately reached for, and is separated by a rule. */
+.card-actions {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex: 0 0 auto;
+}
+
+.card-actions .icon-btn.delete {
+    min-width: 40px;
+    min-height: 40px;
+    font-size: 1rem;
+    border-color: transparent;
+    color: var(--muted);
+    opacity: .55;
+    margin-left: .25rem;
+    padding-left: .6rem;
+    border-left: 1px solid var(--border);
+    border-radius: 0 10px 10px 0;
+}
+
+.card-actions .icon-btn.delete:hover,
+.card-actions .icon-btn.delete:focus-visible {
+    opacity: 1;
+    background: transparent;
+    color: var(--danger);
+    border-color: transparent;
+    border-left-color: var(--border);
+}
+
 /* --- flash messages --- */
 
 .flash {

@@ -150,8 +150,21 @@ def register_routes(app):
 
     @app.route("/recipes/<int:recipe_id>/delete", methods=["POST"])
     def recipe_delete(recipe_id):
-        store.delete_recipe(get_db(), recipe_id)
-        flash("Recipe deleted.", "success")
+        conn = get_db()
+        recipe = conn.execute(
+            "SELECT name FROM recipes WHERE id = ?", (recipe_id,)
+        ).fetchone()
+        if not recipe:
+            return render_template("404.html"), 404
+
+        store.delete_recipe(conn, recipe_id)
+        flash(f"Deleted “{recipe['name']}”.", "success")
+
+        # Return to the filtered list the delete was made from, but only ever
+        # to a same-site path.
+        target = request.form.get("next", "")
+        if target.startswith("/") and not target.startswith("//"):
+            return redirect(target)
         return redirect(url_for("recipes"))
 
     # --- import -------------------------------------------------------------

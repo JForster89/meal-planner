@@ -78,15 +78,29 @@
                             {% if recipe.source_url %}<span class="chip static">HelloFresh</span>{% endif %}
                         </div>
                     </div>
-                    {% if recipe.id in planned %}
-                        <form method="POST" action="{{ url_for('plan_remove', recipe_id=recipe.id) }}">
-                            <button type="submit" class="btn secondary small">✓ In this week</button>
+                    <div class="card-actions">
+                        {% if recipe.id in planned %}
+                            <form method="POST" action="{{ url_for('plan_remove', recipe_id=recipe.id) }}">
+                                <button type="submit" class="btn secondary small">✓ In this week</button>
+                            </form>
+                        {% else %}
+                            <form method="POST" action="{{ url_for('plan_add', recipe_id=recipe.id) }}">
+                                <button type="submit" class="btn small">+ Add to week</button>
+                            </form>
+                        {% endif %}
+
+                        <form method="POST" action="{{ url_for('recipe_delete', recipe_id=recipe.id) }}"
+                              onsubmit="return confirm(
+                                {{ ('Delete “' ~ recipe.name ~ '”?' ~
+                                    ('\n\nIt is in this week&#39;s plan and will be removed from it.' if recipe.id in planned else '') ~
+                                    ('\n\nYou can re-import it from HelloFresh later.' if recipe.source_url else '\n\nThis cannot be undone.')
+                                   ) | tojson }});">
+                            <input type="hidden" name="next" value="{{ request.full_path }}">
+                            <button type="submit" class="icon-btn delete"
+                                    title="Delete {{ recipe.name }}"
+                                    aria-label="Delete {{ recipe.name }}">🗑</button>
                         </form>
-                    {% else %}
-                        <form method="POST" action="{{ url_for('plan_add', recipe_id=recipe.id) }}">
-                            <button type="submit" class="btn small">+ Add to week</button>
-                        </form>
-                    {% endif %}
+                    </div>
                 </div>
             </div>
         {% endfor %}

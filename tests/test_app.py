@@ -1,5 +1,6 @@
 """Route-level tests, including regressions for the bugs found in the original app."""
 
+import pytest
 import re
 
 from werkzeug.datastructures import MultiDict
@@ -295,3 +296,64 @@ def test_backfill_leaves_tagged_recipes_alone(client):
         conn = get_db()
         assert store.backfill_proteins(conn) == 0
         assert [t["tag"] for t in store.get_tags(conn, recipe_id)] == ["Chicken"]
+
+
+# --- deleting from the library ----------------------------------------------
+
+def test_recipe_list_has_a_delete_button(client):
+    make_recipe(client)
+    body = client.get("/recipes").get_data(as_text=True)
+    assert 'action="/recipes/1/delete"' in body
+    assert "confirm(" in body
+
+
+def test_delete_from_list_removes_the_recipe(client):
+    make_recipe(client)
+    assert client.post("/recipes/1/delete", data={"next": "/recipes"}).status_code == 302
+    # Check for the card link, not the name: the flash message legitimately
+    # says 'Deleted "Test Curry"'.
+    body = client.get("/recipes").get_data(as_text=True)
+    assert 'href="/recipes/1"' not in body
+    assert "No recipes yet" in body
+
+
+def test_delete_returns_to_the_filtered_list(client):
+    """Deleting from a filtered view shouldn't throw away the filters."""
+    tagged_recipe(client, "Chicken Korma", "Chicken")
+    tagged_recipe(client, "Chicken Pie", "Chicken")
+    resp = client.post("/recipes/2/delete", data={"next": "/recipes?q=chicken"})
+    assert resp.headers["Location"].endswith("/recipes?q=chicken")
+
+
+@pytest.mark.parametrize("evil", ["https://evil.example.com", "//evil.example.com"])
+def test_delete_next_cannot_redirect_off_site(client, evil):
+    make_recipe(client)
+    resp = client.post("/recipes/1/delete", data={"next": evil})
+    assert "evil.example.com" not in resp.headers["Location"]
+
+
+def test_deleting_a_planned_recipe_clears_it_from_the_plan(client):
+    import store
+    from db import get_db
+
+    make_recipe(client)
+    client.post("/plan/add/1", data={"portions": 2})
+    client.post("/recipes/1/delete")
+
+    with client.application.app_context():
+        conn = get_db()
+        plan = store.get_active_plan(conn)
+        assert store.plan_entries(conn, plan["id"]) == []
+        lines, _ = store.build_shopping_list(conn, plan["id"])
+    assert lines == []
+
+
+def test_deleting_a_missing_recipe_is_404(client):
+    assert client.post("/recipes/999/delete").status_code == 404
+
+
+def test_delete_confirm_warns_when_recipe_is_planned(client):
+    make_recipe(client)
+    client.post("/plan/add/1", data={"portions": 2})
+    body = client.get("/recipes").get_data(as_text=True)
+    assert "removed from it" in body
