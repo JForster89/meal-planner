@@ -62,6 +62,14 @@ input[type=checkbox]{width:24px;height:24px;accent-color:var(--accent);flex:0 0 
 .for{display:block;font-size:.78rem;color:var(--muted)}
 li.done{opacity:.5}
 li.done .txt{text-decoration:line-through}
+/* Aisle signposts: readable while scanning one-handed, without competing
+   with the items themselves. */
+li.aisle-head{background:transparent;border:none;border-radius:0;margin:1.1rem 0 .35rem;
+  padding:0 .2rem .3rem;border-bottom:1px solid var(--border);
+  font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--accent-dark);display:flex;justify-content:space-between;align-items:baseline}
+li.aisle-head:first-child{margin-top:0}
+li.aisle-head .n{font-weight:500;color:var(--muted);letter-spacing:0}
 .pill{display:inline-block;font-size:.7rem;font-weight:700;text-transform:uppercase;
       letter-spacing:.03em;padding:.1rem .45rem;border-radius:999px;
       background:var(--accent-soft);color:var(--accent-dark);border:1px solid var(--border)}
@@ -533,9 +541,31 @@ MANIFEST = {
 }
 
 
-def render_items(lines):
+def render_items(lines, by_aisle=True):
+    """Render the list, grouped into aisles unless asked otherwise.
+
+    This is the copy used in the shop, so it matters more here than in the
+    local app that the order matches how you walk round.
+    """
     if not lines:
         return '<li><div class="empty">Nothing planned this week.</div></li>'
+
+    if by_aisle and any(line.get("aisle") for line in lines):
+        import taxonomy
+
+        grouped = {}
+        for line in lines:
+            grouped.setdefault(line.get("aisle") or "Other", []).append(line)
+
+        chunks = []
+        for aisle in sorted(grouped, key=taxonomy.aisle_sort_key):
+            items = grouped[aisle]
+            chunks.append(
+                f'<li class="aisle-head">{html.escape(aisle)}'
+                f'<span class="n">{len(items)}</span></li>'
+            )
+            chunks.append(render_items(items, by_aisle=False))
+        return "\n".join(chunks)
 
     out = []
     for line in lines:

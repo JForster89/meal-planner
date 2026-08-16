@@ -462,3 +462,54 @@ def test_single_recipe_shows_the_step_nav():
     page = build_cook_page([RECIPE])
     assert "body.no-chooser footer" in page
     assert "no-chooser" in page
+
+
+# --- aisle grouping on the published list ------------------------------------
+
+def aisle_line(name, aisle, qty="1"):
+    return {"key": name.lower(), "name": name, "display_quantity": qty,
+            "recipes": ["R"], "is_pantry": False, "aisle": aisle,
+            "unit": "", "quantity": 1}
+
+
+def test_published_list_groups_by_aisle():
+    """The copy used in the shop is the one that most needs shop order."""
+    out = render_items([
+        aisle_line("Penne Pasta", "Cupboard"),
+        aisle_line("Potatoes", "Fruit & Veg"),
+        aisle_line("Chorizo", "Meat & Fish"),
+    ])
+    assert "aisle-head" in out
+    assert out.index("Fruit &amp; Veg") < out.index("Meat &amp; Fish") < out.index("Cupboard")
+
+
+def test_published_list_counts_each_aisle():
+    out = render_items([
+        aisle_line("Potatoes", "Fruit & Veg"),
+        aisle_line("Onion", "Fruit & Veg"),
+    ])
+    assert '<span class="n">2</span>' in out
+
+
+def test_every_item_still_has_its_checkbox_when_grouped():
+    lines = [aisle_line("Potatoes", "Fruit & Veg"), aisle_line("Chorizo", "Meat & Fish")]
+    out = render_items(lines)
+    assert out.count('type="checkbox"') == 2
+
+
+def test_grouping_can_be_turned_off():
+    out = render_items([aisle_line("Potatoes", "Fruit & Veg")], by_aisle=False)
+    assert "aisle-head" not in out
+    assert "Potatoes" in out
+
+
+def test_lines_without_an_aisle_are_not_grouped():
+    """Older data has no aisle; it should still render as a plain list."""
+    out = render_items([line("Potatoes")])
+    assert "aisle-head" not in out
+    assert "Potatoes" in out
+
+
+def test_aisle_names_are_escaped():
+    out = render_items([aisle_line("X", "<script>bad</script>")])
+    assert "<script>bad" not in out
