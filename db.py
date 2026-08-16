@@ -65,6 +65,12 @@ CREATE TABLE IF NOT EXISTS shopping_state (
     PRIMARY KEY (plan_id, item_key)
 );
 
+-- App-wide preferences, e.g. how many people you normally cook for.
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
 -- Ad-hoc things you need that no recipe asked for (milk, bin bags).
 CREATE TABLE IF NOT EXISTS extra_items (
     id      INTEGER PRIMARY KEY AUTOINCREMENT,

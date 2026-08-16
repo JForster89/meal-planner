@@ -61,6 +61,7 @@ def register_routes(app):
             entries=entries,
             recipes=store.list_recipes(conn),
             item_count=len(lines) + len(extras),
+            default_portions=store.default_portions(conn),
         )
 
     # --- recipe library -----------------------------------------------------
@@ -168,6 +169,20 @@ def register_routes(app):
         plan = store.get_active_plan(conn)
         portions = max(1, request.form.get("portions", type=int) or 2)
         store.set_portions(conn, plan["id"], recipe_id, portions)
+        return redirect(url_for("index"))
+
+    @app.route("/plan/default-portions", methods=["POST"])
+    def plan_default_portions():
+        """Set the household size, and apply it to everything already planned."""
+        conn = get_db()
+        plan = store.get_active_plan(conn)
+        portions = max(1, request.form.get("portions", type=int) or 2)
+        store.set_setting(conn, store.DEFAULT_PORTIONS_KEY, portions)
+
+        for entry in store.plan_entries(conn, plan["id"]):
+            store.set_portions(conn, plan["id"], entry["recipe_id"], portions)
+
+        flash(f"Now cooking for {portions}.", "success")
         return redirect(url_for("index"))
 
     @app.route("/plan/clear", methods=["POST"])

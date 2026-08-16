@@ -1,7 +1,33 @@
 """Persistence for recipes, weekly plans and the shopping list."""
 
-from aggregate import aggregate, normalise_name, normalise_unit
+from aggregate import aggregate
 from db import available_yields, ingredients_for, now_iso
+
+DEFAULT_PORTIONS_KEY = "default_portions"
+
+
+# --- settings ---------------------------------------------------------------
+
+def get_setting(conn, key, fallback=None):
+    row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else fallback
+
+
+def set_setting(conn, key, value):
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (key, str(value)),
+    )
+    conn.commit()
+
+
+def default_portions(conn):
+    """How many people you normally cook for; used for newly planned recipes."""
+    try:
+        return max(1, int(get_setting(conn, DEFAULT_PORTIONS_KEY, 2)))
+    except (TypeError, ValueError):
+        return 2
 
 
 # --- recipes ----------------------------------------------------------------
@@ -139,8 +165,7 @@ def plan_entries(conn, plan_id):
 
 def add_to_plan(conn, plan_id, recipe_id, portions=None):
     if portions is None:
-        row = conn.execute("SELECT servings FROM recipes WHERE id = ?", (recipe_id,)).fetchone()
-        portions = row["servings"] if row else 2
+        portions = default_portions(conn)
     conn.execute(
         "INSERT INTO plan_recipes (plan_id, recipe_id, portions) VALUES (?, ?, ?) "
         "ON CONFLICT(plan_id, recipe_id) DO UPDATE SET portions = excluded.portions",

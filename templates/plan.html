@@ -4,6 +4,17 @@
 {% block content %}
 <h1>This week</h1>
 
+<form method="POST" action="{{ url_for('plan_default_portions') }}" class="card card-row">
+    <label for="default-portions" class="grow" style="margin:0">Cooking for</label>
+    <select id="default-portions" name="portions" onchange="this.form.submit()">
+        {% for n in [1, 2, 3, 4, 5, 6] %}
+            <option value="{{ n }}" {{ 'selected' if n == default_portions }}>{{ n }} {{ 'person' if n == 1 else 'people' }}</option>
+        {% endfor %}
+    </select>
+    <noscript><button type="submit" class="btn small">Set</button></noscript>
+</form>
+<p class="muted">New recipes use this. Changing it updates everything already planned.</p>
+
 {% if entries %}
     <p class="muted">
         {{ entries|length }} recipe{{ 's' if entries|length != 1 }} planned &middot;

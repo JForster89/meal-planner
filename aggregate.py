@@ -6,8 +6,17 @@ That needs two things: a canonical unit (within a measurement dimension) and a
 canonical ingredient name.
 """
 
+import math
 import re
 from collections import OrderedDict
+
+# Units you buy as whole things. Scaling a recipe can produce "1.5 can", which
+# is not something a shop will sell you, so these round up. Weights, volumes
+# and spoons keep their decimals - 675 g and 1.5 tbsp are both usable.
+DISCRETE_UNITS = {
+    "", "clove", "can", "pack", "sachet", "bunch", "punnet",
+    "jar", "bottle", "slice", "pinch", "handful",
+}
 
 # unit alias -> (canonical unit, multiplier to canonical)
 UNIT_ALIASES = {
@@ -96,6 +105,11 @@ def format_quantity(qty, unit):
     """Render a summed quantity in the friendliest unit for that dimension."""
     if qty is None:
         return ""
+
+    # You can't buy 1.5 cans. Published quantities are whole numbers already,
+    # so this only ever bumps values that scaling made fractional.
+    if unit in DISCRETE_UNITS:
+        qty = math.ceil(qty - 1e-9)
 
     if unit == "g" and qty >= 1000:
         qty, unit = qty / 1000.0, "kg"
