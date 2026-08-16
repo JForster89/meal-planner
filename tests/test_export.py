@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from export_static import build_page, render_items, write_site
+from export_static import build_cook_page, build_page, render_items, write_site
 
 
 def line(name, qty="450 g", key=None, recipes=("Curry",), pantry=False):
@@ -170,12 +170,49 @@ def test_cook_page_shows_ingredients_and_marks_pantry():
     assert "cupboard" in page
 
 
-def test_cook_page_picker_only_when_several_recipes():
-    from export_static import build_cook_page
-    assert 'id="picker"' not in build_cook_page([RECIPE])
-    two = build_cook_page([RECIPE, dict(RECIPE, name="Second")])
-    assert 'id="picker"' in two
-    assert two.count('class="deck"') == 2
+def test_single_recipe_opens_straight_into_it():
+    """With one meal there's nothing to choose, so don't ask."""
+    page = build_cook_page([RECIPE])
+    assert 'id="chooser"' not in page
+    assert page.count('class="deck"') == 1
+
+
+def test_several_recipes_ask_which_one_first():
+    page = build_cook_page([RECIPE, dict(RECIPE, name="Second Dish")])
+    assert 'id="chooser"' in page
+    assert "What are you cooking?" in page
+    assert page.count('class="pick"') == 2
+    assert page.count('class="deck"') == 2
+    assert "Second Dish" in page
+
+
+def test_chooser_entries_summarise_each_recipe():
+    page = build_cook_page([RECIPE, dict(RECIPE, name="Second Dish")])
+    assert "35 mins" in page
+    assert "3 steps" in page
+    assert "serves 3" in page
+
+
+def test_chooser_buttons_carry_their_index():
+    page = build_cook_page([RECIPE, dict(RECIPE, name="Second Dish")])
+    assert 'data-index="0"' in page
+    assert 'data-index="1"' in page
+
+
+def test_cook_page_routes_on_the_hash():
+    """Hash routing means the phone's back button returns to the list."""
+    page = build_cook_page([RECIPE, dict(RECIPE, name="Second")])
+    assert "hashchange" in page
+    assert "location.hash" in page
+
+
+def test_chooser_escapes_recipe_names():
+    page = build_cook_page([
+        dict(RECIPE, name='<img src=x onerror=alert(1)>'),
+        dict(RECIPE, name="Second"),
+    ])
+    assert "<img src=x" not in page
+    assert "&lt;img" in page
 
 
 def test_cook_page_handles_missing_method():
@@ -411,3 +448,17 @@ def test_git_still_works_with_the_hidden_window_flags(tmp_path):
     result = _git(["rev-parse", "--is-inside-work-tree"], repo)
     assert result.returncode == 0
     assert result.stdout.strip() == "true"
+
+
+def test_chooser_visible_before_javascript_runs():
+    """Otherwise the page is blank until the routing script executes."""
+    page = build_cook_page([RECIPE, dict(RECIPE, name="Second")])
+    assert "#chooser{display:block" in page
+    assert "body.in-recipe #chooser{display:none}" in page
+
+
+def test_single_recipe_shows_the_step_nav():
+    """With no chooser the footer must still appear."""
+    page = build_cook_page([RECIPE])
+    assert "body.no-chooser footer" in page
+    assert "no-chooser" in page

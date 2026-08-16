@@ -255,7 +255,8 @@ self.addEventListener('fetch', function (e) {
 });
 """
 
-COOK_PAGE = """<!DOCTYPE html>
+# Raw string: the routing JS contains a regex with \d.
+COOK_PAGE = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -285,10 +286,35 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ari
 header{background:var(--surface);border-bottom:1px solid var(--border);padding:.6rem 1rem;flex:0 0 auto}
 .bar{display:flex;align-items:center;gap:.6rem;max-width:700px;margin:0 auto}
 h1{font-size:1rem;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-select{padding:.4rem .5rem;min-height:40px;border:1px solid var(--border);border-radius:8px;
-       background:var(--surface);color:var(--text);font-size:.9rem;font-family:inherit;max-width:55%}
 a.home{color:var(--muted);text-decoration:none;font-size:.85rem;font-weight:600;white-space:nowrap}
 a.home:hover{color:var(--accent-dark)}
+#back{display:none;min-width:44px;min-height:40px;border:1px solid var(--border);
+      border-radius:9px;background:transparent;color:var(--text);font-size:1rem;
+      cursor:pointer;font-family:inherit;flex:0 0 auto}
+#back:hover{background:var(--accent-soft);color:var(--accent-dark)}
+body.in-recipe #back{display:block}
+
+/* --- chooser ---
+   Visible by default so the page shows the list immediately, before the
+   routing script runs. JS hides it once you pick a recipe. */
+#chooser{display:block;padding:1.1rem 1.2rem 2rem;overflow-y:auto;flex:1 1 auto}
+body.in-recipe #chooser{display:none}
+footer{display:none}
+body.in-recipe footer, body.no-chooser footer{display:block}
+.chooser-inner{max-width:660px;margin:0 auto}
+.chooser-inner h2{font-size:1.35rem;margin:0 0 .3rem}
+.pick{display:flex;align-items:center;gap:.9rem;width:100%;text-align:left;
+      background:var(--surface);border:1px solid var(--border);border-radius:12px;
+      padding:.95rem 1rem;margin-bottom:.6rem;cursor:pointer;color:var(--text);
+      font-family:inherit;font-size:1rem;min-height:64px}
+.pick:hover{border-color:var(--accent);background:var(--accent-soft)}
+.pick .n{flex:0 0 auto;width:30px;height:30px;border-radius:50%;background:var(--accent);
+         color:#fff;display:flex;align-items:center;justify-content:center;
+         font-weight:700;font-size:.85rem}
+.pick .t{flex:1;min-width:0}
+.pick .nm{display:block;font-weight:600;line-height:1.35}
+.pick .sub{display:block;font-size:.82rem;color:var(--muted);margin-top:.15rem}
+.pick .go{flex:0 0 auto;color:var(--muted);font-size:1.1rem}
 
 main{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
 .deck{display:none;flex:1 1 auto;min-height:0;flex-direction:column}
@@ -333,13 +359,16 @@ button.nav-btn:disabled{opacity:.3;cursor:default}
 <body>
 <header>
   <div class="bar">
+    <button id="back" aria-label="Back to recipe list">&larr;</button>
     <h1 id="title">Cook</h1>
-    __PICKER__
     <a class="home" href="./index.html">Shopping&nbsp;&rarr;</a>
   </div>
 </header>
 
-<main id="main">__DECKS__</main>
+<main id="main">
+__CHOOSER__
+__DECKS__
+</main>
 
 <footer>
   <div class="nav">
@@ -357,12 +386,17 @@ button.nav-btn:disabled{opacity:.3;cursor:default}
   var decks = Array.prototype.slice.call(document.querySelectorAll('.deck'));
   if (!decks.length) return;
 
-  var picker = document.getElementById('picker');
   var title = document.getElementById('title');
   var dots = document.getElementById('dots');
   var prev = document.getElementById('prev');
   var next = document.getElementById('next');
+  var back = document.getElementById('back');
+  var hasChooser = !!document.getElementById('chooser');
   var current = 0;
+
+  // With a single recipe there is no list to go back to, so the footer nav
+  // is always on and the page opens straight into the steps.
+  if (!hasChooser) document.body.classList.add('no-chooser');
 
   function deck() { return decks[current]; }
   function track() { return deck().querySelector('.track'); }
@@ -395,10 +429,42 @@ button.nav-btn:disabled{opacity:.3;cursor:default}
   function show(i) {
     decks.forEach(function (d, k) { d.classList.toggle('active', k === i); });
     current = i;
+    document.body.classList.add('in-recipe');
     title.textContent = decks[i].dataset.name;
     track().scrollTo({ left: 0 });
     paint();
   }
+
+  function showChooser() {
+    decks.forEach(function (d) { d.classList.remove('active'); });
+    document.body.classList.remove('in-recipe');
+    title.textContent = 'What are you cooking?';
+  }
+
+  // Driven by the URL hash so the phone's own back button leaves a recipe
+  // and returns to the list, rather than leaving the page entirely.
+  function route() {
+    var match = /^#r(\d+)$/.exec(window.location.hash);
+    if (match && decks[+match[1]]) {
+      show(+match[1]);
+    } else if (hasChooser) {
+      showChooser();
+    } else {
+      show(0);
+    }
+  }
+
+  window.addEventListener('hashchange', route);
+
+  Array.prototype.forEach.call(document.querySelectorAll('.pick'), function (btn) {
+    btn.addEventListener('click', function () {
+      window.location.hash = 'r' + btn.dataset.index;
+    });
+  });
+
+  back.addEventListener('click', function () {
+    if (hasChooser) window.location.hash = '';
+  });
 
   decks.forEach(function (d) {
     var t = d.querySelector('.track');
@@ -416,10 +482,6 @@ button.nav-btn:disabled{opacity:.3;cursor:default}
     if (e.key === 'ArrowLeft') go(-1);
     if (e.key === 'ArrowRight') go(1);
   });
-
-  if (picker) {
-    picker.addEventListener('change', function () { show(parseInt(picker.value, 10)); });
-  }
 
   window.addEventListener('resize', paint);
 
@@ -442,7 +504,7 @@ button.nav-btn:disabled{opacity:.3;cursor:default}
     awake.parentElement.style.display = 'none';
   }
 
-  show(0);
+  route();
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(function () {});
@@ -543,21 +605,45 @@ def render_cook_decks(recipes):
     return "".join(decks)
 
 
-def render_picker(recipes):
+def render_chooser(recipes):
+    """A "what are you cooking?" screen, shown when a week has several meals.
+
+    With one recipe there's nothing to choose, so it opens straight into it.
+    """
     if len(recipes) < 2:
         return ""
-    options = "".join(
-        f'<option value="{i}">{html.escape(r["name"])}</option>'
-        for i, r in enumerate(recipes)
+
+    picks = []
+    for i, recipe in enumerate(recipes):
+        bits = []
+        if recipe.get("cooking_time_mins"):
+            bits.append(f"{recipe['cooking_time_mins']} mins")
+        steps = len(recipe.get("steps", []))
+        bits.append(f"{steps} step{'s' if steps != 1 else ''}")
+        bits.append(f"serves {recipe.get('portions', 2)}")
+
+        picks.append(
+            f'<button class="pick" data-index="{i}">'
+            f'<span class="n">{i + 1}</span>'
+            f'<span class="t"><span class="nm">{html.escape(recipe["name"])}</span>'
+            f'<span class="sub">{html.escape(" · ".join(bits))}</span></span>'
+            f'<span class="go">&rarr;</span></button>'
+        )
+
+    return (
+        '<div id="chooser"><div class="chooser-inner">'
+        "<h2>What are you cooking?</h2>"
+        f'<p class="meta">{len(recipes)} meals planned this week.</p>'
+        f'{"".join(picks)}'
+        "</div></div>"
     )
-    return f'<select id="picker" aria-label="Choose recipe">{options}</select>'
 
 
 def build_cook_page(recipes):
     return (
         COOK_PAGE
         .replace("__DECKS__", render_cook_decks(recipes))
-        .replace("__PICKER__", render_picker(recipes))
+        .replace("__CHOOSER__", render_chooser(recipes))
     )
 
 
