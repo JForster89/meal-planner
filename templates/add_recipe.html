@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add New Recipe</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1 {
+            text-align: center;
+        }
+        form {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .inline-input {
+            display: flex;
+            gap: 10px;
+        }
+        .inline-input input {
+            flex: 1;
+        }
+        .add-btn, .save-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .add-btn {
+            margin-bottom: 10px;
+        }
+        .add-btn:hover, .save-btn:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>Add New Recipe</h1>
+    <form method="POST">
+        <label for="name">Recipe Title:</label>
+        <input type="text" id="name" name="name" placeholder="Recipe Title" required>
+        
+        <div class="inline-input">
+            <div>
+                <label for="cooking_time">Cooking Time:</label>
+                <input type="text" id="cooking_time" name="cooking_time" placeholder="e.g. 30 mins">
+            </div>
+            <div>
+                <label for="servings">Servings:</label>
+                <input type="number" id="servings" name="servings" placeholder="2" min="1" required>
+            </div>
+        </div>
+        
+        <label>Ingredients:</label>
+        <div id="ingredients-container">
+            <div class="inline-input">
+                <input type="text" name="ingredient_amount[]" placeholder="Amount">
+                <input type="text" name="ingredient_unit[]" placeholder="Unit">
+                <input type="text" name="ingredient_name[]" placeholder="Ingredient name">
+            </div>
+        </div>
+        <button type="button" class="add-btn" onclick="addIngredient()">+ Add Ingredient</button>
+        
+        <label>Instructions:</label>
+        <div id="instructions-container">
+            <textarea name="instruction[]" rows="2" placeholder="Step 1"></textarea>
+        </div>
+        <button type="button" class="add-btn" onclick="addInstruction()">+ Add Step</button>
+        
+        <button type="submit" class="save-btn">Save Recipe</button>
+    </form>
+    <script>
+        function addIngredient() {
+            const container = document.getElementById('ingredients-container');
+            const div = document.createElement('div');
+            div.classList.add('inline-input');
+            div.innerHTML = `
+                <input type="text" name="ingredient_amount[]" placeholder="Amount">
+                <input type="text" name="ingredient_unit[]" placeholder="Unit">
+                <input type="text" name="ingredient_name[]" placeholder="Ingredient name">
+            `;
+            container.appendChild(div);
+        }
+        function addInstruction() {
+            const container = document.getElementById('instructions-container');
+            const textarea = document.createElement('textarea');
+            textarea.name = 'instruction[]';
+            textarea.rows = 2;
+            textarea.placeholder = `Step ${container.children.length + 1}`;
+            container.appendChild(textarea);
+        }
+    </script>
+</body>
+</html>
