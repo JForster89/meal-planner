@@ -381,3 +381,33 @@ def test_publish_route_reports_success_with_url(client, tmp_path, monkeypatch):
     body = client.post("/publish", follow_redirects=True).get_data(as_text=True)
     assert "Pushed." in body
     assert "https://x.github.io/y/" in body
+
+
+def test_git_calls_are_windowless_on_windows(monkeypatch):
+    """Under pythonw each git call would otherwise flash up a cmd window."""
+    import subprocess
+    import export_static
+
+    monkeypatch.setattr(export_static.sys, "platform", "win32")
+    kwargs = export_static._no_window_kwargs()
+    assert kwargs["creationflags"] == getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+    assert kwargs["startupinfo"].wShowWindow == subprocess.SW_HIDE
+
+
+def test_no_window_kwargs_empty_off_windows(monkeypatch):
+    import export_static
+
+    monkeypatch.setattr(export_static.sys, "platform", "linux")
+    assert export_static._no_window_kwargs() == {}
+
+
+def test_git_still_works_with_the_hidden_window_flags(tmp_path):
+    """The flags must not break the call itself."""
+    import subprocess
+    from export_static import _git
+
+    repo = str(tmp_path)
+    subprocess.run(["git", "init", "-q", repo], check=True)
+    result = _git(["rev-parse", "--is-inside-work-tree"], repo)
+    assert result.returncode == 0
+    assert result.stdout.strip() == "true"

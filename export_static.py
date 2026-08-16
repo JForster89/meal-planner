@@ -602,11 +602,50 @@ class PublishError(Exception):
     """Raised when the generated site couldn't be pushed."""
 
 
+def _no_window_kwargs():
+    """Stop Windows opening a console for each child process.
+
+    The app runs under pythonw.exe, which has no console of its own, so every
+    git call would otherwise flash up its own cmd window - and a publish makes
+    several in a row.
+    """
+    if sys.platform != "win32":
+        return {}
+
+    import subprocess
+
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    startupinfo.wShowWindow = subprocess.SW_HIDE
+    return {
+        "creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
+        "startupinfo": startupinfo,
+    }
+
+
+def _git_env():
+    """Keep git and its helpers from trying to talk to a user.
+
+    CREATE_NO_WINDOW only covers git itself. During a push git spawns
+    git-remote-https and git-credential-manager, and those grandchildren
+    allocate their own console. Telling them never to prompt keeps them
+    headless - the credential is already cached, so nothing needs asking.
+    """
+    env = dict(os.environ)
+    env.update({
+        "GIT_TERMINAL_PROMPT": "0",
+        "GCM_INTERACTIVE": "never",
+        "GIT_OPTIONAL_LOCKS": "0",
+    })
+    return env
+
+
 def _git(args, cwd, timeout=90):
     import subprocess
 
     return subprocess.run(
-        ["git", *args], cwd=cwd, capture_output=True, text=True, timeout=timeout
+        ["git", *args], cwd=cwd, capture_output=True, text=True, timeout=timeout,
+        env=_git_env(), **_no_window_kwargs(),
     )
 
 
