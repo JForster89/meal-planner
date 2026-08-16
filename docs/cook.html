@@ -28,10 +28,35 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ari
 header{background:var(--surface);border-bottom:1px solid var(--border);padding:.6rem 1rem;flex:0 0 auto}
 .bar{display:flex;align-items:center;gap:.6rem;max-width:700px;margin:0 auto}
 h1{font-size:1rem;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-select{padding:.4rem .5rem;min-height:40px;border:1px solid var(--border);border-radius:8px;
-       background:var(--surface);color:var(--text);font-size:.9rem;font-family:inherit;max-width:55%}
 a.home{color:var(--muted);text-decoration:none;font-size:.85rem;font-weight:600;white-space:nowrap}
 a.home:hover{color:var(--accent-dark)}
+#back{display:none;min-width:44px;min-height:40px;border:1px solid var(--border);
+      border-radius:9px;background:transparent;color:var(--text);font-size:1rem;
+      cursor:pointer;font-family:inherit;flex:0 0 auto}
+#back:hover{background:var(--accent-soft);color:var(--accent-dark)}
+body.in-recipe #back{display:block}
+
+/* --- chooser ---
+   Visible by default so the page shows the list immediately, before the
+   routing script runs. JS hides it once you pick a recipe. */
+#chooser{display:block;padding:1.1rem 1.2rem 2rem;overflow-y:auto;flex:1 1 auto}
+body.in-recipe #chooser{display:none}
+footer{display:none}
+body.in-recipe footer, body.no-chooser footer{display:block}
+.chooser-inner{max-width:660px;margin:0 auto}
+.chooser-inner h2{font-size:1.35rem;margin:0 0 .3rem}
+.pick{display:flex;align-items:center;gap:.9rem;width:100%;text-align:left;
+      background:var(--surface);border:1px solid var(--border);border-radius:12px;
+      padding:.95rem 1rem;margin-bottom:.6rem;cursor:pointer;color:var(--text);
+      font-family:inherit;font-size:1rem;min-height:64px}
+.pick:hover{border-color:var(--accent);background:var(--accent-soft)}
+.pick .n{flex:0 0 auto;width:30px;height:30px;border-radius:50%;background:var(--accent);
+         color:#fff;display:flex;align-items:center;justify-content:center;
+         font-weight:700;font-size:.85rem}
+.pick .t{flex:1;min-width:0}
+.pick .nm{display:block;font-weight:600;line-height:1.35}
+.pick .sub{display:block;font-size:.82rem;color:var(--muted);margin-top:.15rem}
+.pick .go{flex:0 0 auto;color:var(--muted);font-size:1.1rem}
 
 main{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
 .deck{display:none;flex:1 1 auto;min-height:0;flex-direction:column}
@@ -76,13 +101,16 @@ button.nav-btn:disabled{opacity:.3;cursor:default}
 <body>
 <header>
   <div class="bar">
+    <button id="back" aria-label="Back to recipe list">&larr;</button>
     <h1 id="title">Cook</h1>
-    <select id="picker" aria-label="Choose recipe"><option value="0">Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole</option><option value="1">Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</option></select>
     <a class="home" href="./index.html">Shopping&nbsp;&rarr;</a>
   </div>
 </header>
 
-<main id="main"><div class="deck" data-name="Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole"><div class="track"><div class="card"><div class="card-inner"><h2>Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole</h2><p class="meta">45 mins · serves 2</p><ul class="ing"><li><span class="q">450</span><span>Potatoes</span></li><li><span class="q">1</span><span>Bell Pepper</span></li><li><span class="q">2</span><span>Garlic Clove</span></li><li><span class="q">240</span><span>British Beef Mince</span></li><li><span class="q">1</span><span>Mexican Style Spice Mix</span></li><li><span class="q">1</span><span>Finely Chopped Tomatoes</span></li><li><span class="q">10</span><span>Beef Stock Paste</span></li><li><span class="q">1</span><span>Avocado</span></li><li><span class="q">1</span><span>Lime</span></li><li><span class="q">30</span><span>Mature Cheddar Cheese</span></li><li><span class="q">50</span><span>Water for the Beef <span class="pill">cupboard</span></span></li></ul></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 1 of 6</div><div class="step-text">Preheat your oven to 200°C. Chop the potatoes into 2cm chunks (no need to peel). Pop them on a large baking tray. Drizzle with oil, then season with salt and pepper. Toss to coat, then spread out in a single layer. TIP: Use two baking trays if necessary. Roast on the top shelf of your oven until golden, 25-30 mins. Turn halfway through.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 2 of 6</div><div class="step-text">Meanwhile, halve the pepper, discard the core and seeds then chop into 2cm chunks. Peel and grate the garlic (or use a garlic press).</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 3 of 6</div><div class="step-text">Heat a drizzle of oil in a large frying pan on medium-high heat. When hot, add the beef mince and cook until browned, 4-5 mins, breaking it up with a spoon as it cooks. IMPORTANT: Wash your hands and equipment after handling raw mince. The mince is cooked when no longer pink in the middle. Once browned, drain and discard any excess fat. Add the pepper to the beef, stir together, and cook until softened, 5-7 mins, stirring occasionally. Season with salt and pepper.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 4 of 6</div><div class="step-text">Stir the Mexican style spice mix and garlic into the beef and cook for 1 min. Pour in the chopped tomatoes and water (see ingredients for amount). Stir in the beef stock paste, bring to the boil then reduce the heat to medium. Allow to simmer and thicken, stirring occasionally until there is almost no liquid left, 12-15 mins. TIP: Add a splash more water if the mixture looks a little dry.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 5 of 6</div><div class="step-text">Meanwhile, slice lengthways into the avocado. Once you reach the stone, turn the avocado around to cut it in half. Twist each half and pull it apart. Remove the stone then scoop out the insides into a bowl. Halve the lime and add a squeeze of juice and a pinch of salt and pepper. Mash with a fork. Taste and add more salt, pepper and lime juice if required. Grate the cheese.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 6 of 6</div><div class="step-text">Once the sauce has thickened, season with salt and pepper to taste. Spoon into an ovenproof dish. Top with the roasted potato and sprinkle over the cheese. Place on the top shelf of your oven and bake until the cheese has melted and is nice and golden, 10-12 mins. Once golden, serve in deep bowls with a dollop of guacamole. Enjoy!</div></div></div></div></div><div class="deck" data-name="Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli"><div class="track"><div class="card"><div class="card-inner"><h2>Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</h2><p class="meta">30 mins · serves 2</p><ul class="ing"><li><span class="q">16</span><span>Plain Flour</span></li><li><span class="q">200</span><span>Penne Pasta</span></li><li><span class="q">150</span><span>Tenderstem® Broccoli</span></li><li><span class="q">1</span><span>Chicken Stock Powder</span></li><li><span class="q">1</span><span>Echalion Shallot</span></li><li><span class="q">1</span><span>Dried Thyme</span></li><li><span class="q">60</span><span>Chorizo</span></li><li><span class="q">1</span><span>Garlic Clove</span></li><li><span class="q">60</span><span>Mature Cheddar Cheese</span></li><li><span class="q">25</span><span>Panko Breadcrumbs</span></li><li><span class="q">150</span><span>Creme Fraiche</span></li><li><span class="q">1</span><span>Olive Oil <span class="pill">cupboard</span></span></li><li><span class="q">200</span><span>Water for the Sauce <span class="pill">cupboard</span></span></li></ul></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 1 of 6</div><div class="step-text">Preheat your oven to 200°C. Bring a large saucepan of water to the boil with 0.5 tsp of salt for the pasta. Halve, peel and thinly slice the shallot. Peel and grate the garlic (or use a garlic press). Grate the cheese. Once boiling, add the wheat penne to the water, simmer until cooked, 12 mins. Drain in a colander, pop back in the pan and stir through a little oil to stop it sticking together.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 2 of 6</div><div class="step-text">Heat a drizzle of oil in a frying pan on medium-high heat. Once the oil is hot, add the chorizo and stir-fry until it releases its lovely red oil, 1-2 mins. Don&#x27;t let it take on too much colour! Pour the chorizo and all its oil into a bowl and add the breadcrumbs and the olive oil (see ingredient list for amount). Add a grind of pepper, stir to coat the crumbs in the oil and leave to the side.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 3 of 6</div><div class="step-text">Put your frying pan back on medium-high heat. Add the oil (see ingredients for amount) and the shallot. Stir-fry until the shallot is soft, 3-4 mins then stir in the flour. Cook until it forms a paste consistency, 1-2 mins. Gradually, stir in the water (see ingredient list for amount) and the stock powder. Bring to the boil, stir and simmer until thickened, 1-2 mins. Stir in the creme fraiche, then remove from the heat.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 4 of 6</div><div class="step-text">Add the dried thyme and cheddar to the sauce and stir until the cheese is melted. Taste and add salt and pepper if it needs it. Add the pasta to the sauce and stir to combine with a splash of water to loosen if you need to. Pour into an ovenproof dish. Sprinkle the chorizo crumb evenly over the top, then bake on the top shelf of your oven until the crumbs are golden, 5-6 mins. Once cooked, remove from your oven. Meanwhile, wash out your frying pan and pop back on medium high heat.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 5 of 6</div><div class="step-text">Add a drizzle of oil to your frying pan and once hot, add the Tenderstem broccoli and season with salt and pepper. Stir-fry until starting to char, 1-2 mins. Add the garlic to the pan and stir-fry for a minute longer, then add a splash of water and cover the pan with a lid or kitchen foil. Lower the heat to medium and steam the broccoli until tender, 4-5 mins. Remove the pan from the heat.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 6 of 6</div><div class="step-text">Spoon the penne &#x27;n cheese into bowls and serve the broccoli alongside. Enjoy!</div></div></div></div></div></main>
+<main id="main">
+<div id="chooser"><div class="chooser-inner"><h2>What are you cooking?</h2><p class="meta">2 meals planned this week.</p><button class="pick" data-index="0"><span class="n">1</span><span class="t"><span class="nm">Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole</span><span class="sub">45 mins · 6 steps · serves 2</span></span><span class="go">&rarr;</span></button><button class="pick" data-index="1"><span class="n">2</span><span class="t"><span class="nm">Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</span><span class="sub">30 mins · 6 steps · serves 2</span></span><span class="go">&rarr;</span></button></div></div>
+<div class="deck" data-name="Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole"><div class="track"><div class="card"><div class="card-inner"><h2>Cheesy Mexican Style Beef Hash with Crispy Potato Top and Guacamole</h2><p class="meta">45 mins · serves 2</p><ul class="ing"><li><span class="q">450</span><span>Potatoes</span></li><li><span class="q">1</span><span>Bell Pepper</span></li><li><span class="q">2</span><span>Garlic Clove</span></li><li><span class="q">240</span><span>British Beef Mince</span></li><li><span class="q">1</span><span>Mexican Style Spice Mix</span></li><li><span class="q">1</span><span>Finely Chopped Tomatoes</span></li><li><span class="q">10</span><span>Beef Stock Paste</span></li><li><span class="q">1</span><span>Avocado</span></li><li><span class="q">1</span><span>Lime</span></li><li><span class="q">30</span><span>Mature Cheddar Cheese</span></li><li><span class="q">50</span><span>Water for the Beef <span class="pill">cupboard</span></span></li></ul></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 1 of 6</div><div class="step-text">Preheat your oven to 200°C. Chop the potatoes into 2cm chunks (no need to peel). Pop them on a large baking tray. Drizzle with oil, then season with salt and pepper. Toss to coat, then spread out in a single layer. TIP: Use two baking trays if necessary. Roast on the top shelf of your oven until golden, 25-30 mins. Turn halfway through.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 2 of 6</div><div class="step-text">Meanwhile, halve the pepper, discard the core and seeds then chop into 2cm chunks. Peel and grate the garlic (or use a garlic press).</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 3 of 6</div><div class="step-text">Heat a drizzle of oil in a large frying pan on medium-high heat. When hot, add the beef mince and cook until browned, 4-5 mins, breaking it up with a spoon as it cooks. IMPORTANT: Wash your hands and equipment after handling raw mince. The mince is cooked when no longer pink in the middle. Once browned, drain and discard any excess fat. Add the pepper to the beef, stir together, and cook until softened, 5-7 mins, stirring occasionally. Season with salt and pepper.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 4 of 6</div><div class="step-text">Stir the Mexican style spice mix and garlic into the beef and cook for 1 min. Pour in the chopped tomatoes and water (see ingredients for amount). Stir in the beef stock paste, bring to the boil then reduce the heat to medium. Allow to simmer and thicken, stirring occasionally until there is almost no liquid left, 12-15 mins. TIP: Add a splash more water if the mixture looks a little dry.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 5 of 6</div><div class="step-text">Meanwhile, slice lengthways into the avocado. Once you reach the stone, turn the avocado around to cut it in half. Twist each half and pull it apart. Remove the stone then scoop out the insides into a bowl. Halve the lime and add a squeeze of juice and a pinch of salt and pepper. Mash with a fork. Taste and add more salt, pepper and lime juice if required. Grate the cheese.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 6 of 6</div><div class="step-text">Once the sauce has thickened, season with salt and pepper to taste. Spoon into an ovenproof dish. Top with the roasted potato and sprinkle over the cheese. Place on the top shelf of your oven and bake until the cheese has melted and is nice and golden, 10-12 mins. Once golden, serve in deep bowls with a dollop of guacamole. Enjoy!</div></div></div></div></div><div class="deck" data-name="Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli"><div class="track"><div class="card"><div class="card-inner"><h2>Chorizo-Crusted Penne &#x27;n&#x27; Cheese with Garlicky Tenderstem Broccoli</h2><p class="meta">30 mins · serves 2</p><ul class="ing"><li><span class="q">16</span><span>Plain Flour</span></li><li><span class="q">200</span><span>Penne Pasta</span></li><li><span class="q">150</span><span>Tenderstem® Broccoli</span></li><li><span class="q">1</span><span>Chicken Stock Powder</span></li><li><span class="q">1</span><span>Echalion Shallot</span></li><li><span class="q">1</span><span>Dried Thyme</span></li><li><span class="q">60</span><span>Chorizo</span></li><li><span class="q">1</span><span>Garlic Clove</span></li><li><span class="q">60</span><span>Mature Cheddar Cheese</span></li><li><span class="q">25</span><span>Panko Breadcrumbs</span></li><li><span class="q">150</span><span>Creme Fraiche</span></li><li><span class="q">1</span><span>Olive Oil <span class="pill">cupboard</span></span></li><li><span class="q">200</span><span>Water for the Sauce <span class="pill">cupboard</span></span></li></ul></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 1 of 6</div><div class="step-text">Preheat your oven to 200°C. Bring a large saucepan of water to the boil with 0.5 tsp of salt for the pasta. Halve, peel and thinly slice the shallot. Peel and grate the garlic (or use a garlic press). Grate the cheese. Once boiling, add the wheat penne to the water, simmer until cooked, 12 mins. Drain in a colander, pop back in the pan and stir through a little oil to stop it sticking together.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 2 of 6</div><div class="step-text">Heat a drizzle of oil in a frying pan on medium-high heat. Once the oil is hot, add the chorizo and stir-fry until it releases its lovely red oil, 1-2 mins. Don&#x27;t let it take on too much colour! Pour the chorizo and all its oil into a bowl and add the breadcrumbs and the olive oil (see ingredient list for amount). Add a grind of pepper, stir to coat the crumbs in the oil and leave to the side.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 3 of 6</div><div class="step-text">Put your frying pan back on medium-high heat. Add the oil (see ingredients for amount) and the shallot. Stir-fry until the shallot is soft, 3-4 mins then stir in the flour. Cook until it forms a paste consistency, 1-2 mins. Gradually, stir in the water (see ingredient list for amount) and the stock powder. Bring to the boil, stir and simmer until thickened, 1-2 mins. Stir in the creme fraiche, then remove from the heat.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 4 of 6</div><div class="step-text">Add the dried thyme and cheddar to the sauce and stir until the cheese is melted. Taste and add salt and pepper if it needs it. Add the pasta to the sauce and stir to combine with a splash of water to loosen if you need to. Pour into an ovenproof dish. Sprinkle the chorizo crumb evenly over the top, then bake on the top shelf of your oven until the crumbs are golden, 5-6 mins. Once cooked, remove from your oven. Meanwhile, wash out your frying pan and pop back on medium high heat.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 5 of 6</div><div class="step-text">Add a drizzle of oil to your frying pan and once hot, add the Tenderstem broccoli and season with salt and pepper. Stir-fry until starting to char, 1-2 mins. Add the garlic to the pan and stir-fry for a minute longer, then add a splash of water and cover the pan with a lid or kitchen foil. Lower the heat to medium and steam the broccoli until tender, 4-5 mins. Remove the pan from the heat.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 6 of 6</div><div class="step-text">Spoon the penne &#x27;n cheese into bowls and serve the broccoli alongside. Enjoy!</div></div></div></div></div>
+</main>
 
 <footer>
   <div class="nav">
@@ -100,12 +128,17 @@ button.nav-btn:disabled{opacity:.3;cursor:default}
   var decks = Array.prototype.slice.call(document.querySelectorAll('.deck'));
   if (!decks.length) return;
 
-  var picker = document.getElementById('picker');
   var title = document.getElementById('title');
   var dots = document.getElementById('dots');
   var prev = document.getElementById('prev');
   var next = document.getElementById('next');
+  var back = document.getElementById('back');
+  var hasChooser = !!document.getElementById('chooser');
   var current = 0;
+
+  // With a single recipe there is no list to go back to, so the footer nav
+  // is always on and the page opens straight into the steps.
+  if (!hasChooser) document.body.classList.add('no-chooser');
 
   function deck() { return decks[current]; }
   function track() { return deck().querySelector('.track'); }
@@ -138,10 +171,42 @@ button.nav-btn:disabled{opacity:.3;cursor:default}
   function show(i) {
     decks.forEach(function (d, k) { d.classList.toggle('active', k === i); });
     current = i;
+    document.body.classList.add('in-recipe');
     title.textContent = decks[i].dataset.name;
     track().scrollTo({ left: 0 });
     paint();
   }
+
+  function showChooser() {
+    decks.forEach(function (d) { d.classList.remove('active'); });
+    document.body.classList.remove('in-recipe');
+    title.textContent = 'What are you cooking?';
+  }
+
+  // Driven by the URL hash so the phone's own back button leaves a recipe
+  // and returns to the list, rather than leaving the page entirely.
+  function route() {
+    var match = /^#r(\d+)$/.exec(window.location.hash);
+    if (match && decks[+match[1]]) {
+      show(+match[1]);
+    } else if (hasChooser) {
+      showChooser();
+    } else {
+      show(0);
+    }
+  }
+
+  window.addEventListener('hashchange', route);
+
+  Array.prototype.forEach.call(document.querySelectorAll('.pick'), function (btn) {
+    btn.addEventListener('click', function () {
+      window.location.hash = 'r' + btn.dataset.index;
+    });
+  });
+
+  back.addEventListener('click', function () {
+    if (hasChooser) window.location.hash = '';
+  });
 
   decks.forEach(function (d) {
     var t = d.querySelector('.track');
@@ -159,10 +224,6 @@ button.nav-btn:disabled{opacity:.3;cursor:default}
     if (e.key === 'ArrowLeft') go(-1);
     if (e.key === 'ArrowRight') go(1);
   });
-
-  if (picker) {
-    picker.addEventListener('change', function () { show(parseInt(picker.value, 10)); });
-  }
 
   window.addEventListener('resize', paint);
 
@@ -185,7 +246,7 @@ button.nav-btn:disabled{opacity:.3;cursor:default}
     awake.parentElement.style.display = 'none';
   }
 
-  show(0);
+  route();
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(function () {});
