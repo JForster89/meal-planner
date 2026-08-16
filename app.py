@@ -71,8 +71,37 @@ def register_routes(app):
         conn = get_db()
         plan = store.get_active_plan(conn)
         planned = {e["recipe_id"] for e in store.plan_entries(conn, plan["id"])}
+
+        query = (request.args.get("q") or "").strip()
+        tag = (request.args.get("tag") or "").strip()
+        protein = (request.args.get("protein") or "").strip()
+        group_by = request.args.get("group", "protein")
+
+        found = store.search_recipes(conn, query or None, tag or None, protein or None)
+        tags_by_recipe = store.tags_for_recipes(conn)
+
+        # Group into an ordered mapping the template can just iterate.
+        groups = {}
+        if group_by in ("protein", "cuisine"):
+            for recipe in found:
+                labels = [
+                    t["tag"] for t in tags_by_recipe.get(recipe["id"], [])
+                    if t["kind"] == group_by
+                ] or ["Other"]
+                groups.setdefault(labels[0], []).append(recipe)
+            groups = dict(sorted(groups.items(), key=lambda kv: (kv[0] == "Other", kv[0])))
+        else:
+            groups = {"": list(found)}
+
         return render_template(
-            "recipes.html", recipes=store.list_recipes(conn), planned=planned
+            "recipes.html",
+            groups=groups,
+            total=len(found),
+            planned=planned,
+            tags_by_recipe=tags_by_recipe,
+            proteins=store.all_tags(conn, "protein"),
+            tag_options=store.all_tags(conn, "tag"),
+            q=query, active_tag=tag, active_protein=protein, group_by=group_by,
         )
 
     @app.route("/recipes/<int:recipe_id>")
@@ -260,15 +289,16 @@ def register_routes(app):
         include_pantry = request.form.get("pantry") == "1"
         lines, _ = store.build_shopping_list(conn, plan["id"], include_pantry)
         names = [e["name"] for e in store.plan_entries(conn, plan["id"])]
+        recipes = export_static.collect_planned_recipes(conn, plan["id"])
 
         try:
-            export_static.write_site(lines, names)
+            export_static.write_site(lines, names, recipes=recipes)
         except OSError as exc:
             flash(f"Couldn't write the files: {exc}", "error")
             return redirect(url_for("shopping"))
 
         flash(
-            f"Published {len(lines)} items to docs/. "
+            f"Published {len(lines)} items and {len(recipes)} cook cards to docs/. "
             "Commit and push to update your phone.",
             "success",
         )

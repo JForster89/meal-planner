@@ -170,3 +170,96 @@ def test_portions_falls_back_to_scaling(client):
     with client.application.app_context():
         recipe = store.get_recipe(get_db(), 1, portions=6)
     assert recipe["multiplier"] == 3.0
+
+
+# --- search, tags and grouping ----------------------------------------------
+
+def tagged_recipe(client, name, protein, tags=(), cuisines=(), ingredient="Potatoes"):
+    import store
+    from db import get_db
+
+    with client.application.app_context():
+        return store.save_recipe(get_db(), {
+            "name": name, "servings": 2, "cooking_time_mins": 30,
+            "yields": {2: [{"quantity": 1, "unit": "", "name": ingredient,
+                            "is_pantry": False}]},
+            "instructions": [], "protein": protein,
+            "tags": list(tags), "cuisines": list(cuisines),
+        })
+
+
+def test_search_matches_recipe_name(client):
+    tagged_recipe(client, "Chicken Korma", "Chicken")
+    tagged_recipe(client, "Beef Stew", "Beef")
+    body = client.get("/recipes?q=korma").get_data(as_text=True)
+    assert "Chicken Korma" in body
+    assert "Beef Stew" not in body
+
+
+def test_search_matches_ingredient_not_just_title(client):
+    """'chorizo' should find the pasta dish even though the title omits it."""
+    tagged_recipe(client, "Penne 'n' Cheese", "Pork", ingredient="Chorizo")
+    body = client.get("/recipes?q=chorizo").get_data(as_text=True)
+    assert "Penne" in body
+
+
+def test_filter_by_protein(client):
+    tagged_recipe(client, "Chicken Korma", "Chicken")
+    tagged_recipe(client, "Beef Stew", "Beef")
+    body = client.get("/recipes?protein=Beef").get_data(as_text=True)
+    assert "Beef Stew" in body
+    assert "Chicken Korma" not in body
+
+
+def test_filter_by_tag(client):
+    tagged_recipe(client, "Fast One", "Chicken", tags=["Quick and Easy"])
+    tagged_recipe(client, "Slow One", "Chicken", tags=["Family Friendly"])
+    body = client.get("/recipes?tag=Quick+and+Easy").get_data(as_text=True)
+    assert "Fast One" in body
+    assert "Slow One" not in body
+
+
+def test_search_and_filter_combine(client):
+    tagged_recipe(client, "Chicken Korma", "Chicken", tags=["Quick and Easy"])
+    tagged_recipe(client, "Chicken Pie", "Chicken", tags=["Family Friendly"])
+    body = client.get("/recipes?q=chicken&tag=Quick+and+Easy").get_data(as_text=True)
+    assert "Chicken Korma" in body
+    assert "Chicken Pie" not in body
+
+
+def test_grouping_headings_appear(client):
+    tagged_recipe(client, "Chicken Korma", "Chicken")
+    tagged_recipe(client, "Beef Stew", "Beef")
+    body = client.get("/recipes?group=protein").get_data(as_text=True)
+    assert "<h2>Beef" in body
+    assert "<h2>Chicken" in body
+
+
+def test_grouping_by_cuisine(client):
+    tagged_recipe(client, "Korma", "Chicken", cuisines=["Indian"])
+    body = client.get("/recipes?group=cuisine").get_data(as_text=True)
+    assert "<h2>Indian" in body
+
+
+def test_no_results_message(client):
+    tagged_recipe(client, "Chicken Korma", "Chicken")
+    body = client.get("/recipes?q=zzzznotathing").get_data(as_text=True)
+    assert "Nothing matched" in body
+
+
+def test_tags_are_replaced_not_duplicated_on_reimport(client):
+    import store
+    from db import get_db
+
+    recipe_id = tagged_recipe(client, "Dish", "Chicken", tags=["Old Tag"])
+    with client.application.app_context():
+        conn = get_db()
+        store.save_recipe(conn, {
+            "name": "Dish", "servings": 2, "cooking_time_mins": 30,
+            "yields": {2: [{"quantity": 1, "unit": "", "name": "X", "is_pantry": False}]},
+            "instructions": [], "protein": "Beef", "tags": ["New Tag"], "cuisines": [],
+        }, recipe_id=recipe_id)
+        tags = store.get_tags(conn, recipe_id)
+
+    names = {t["tag"] for t in tags}
+    assert names == {"New Tag", "Beef"}

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#2f7d32">
+<title>Cook</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+:root {
+  --bg:#f6f7f5; --surface:#fff; --border:#e2e5e0; --text:#1c2119;
+  --muted:#6b7280; --accent:#2f7d32; --accent-dark:#24631f; --accent-soft:#eaf4ea;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:#14171a; --surface:#1d2125; --border:#2d3339; --text:#e8eae7;
+    --muted:#9aa3ad; --accent:#5cbf60; --accent-dark:#7bd47f; --accent-soft:#1e2c1f;
+  }
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+     background:var(--bg);color:var(--text);line-height:1.5;-webkit-text-size-adjust:100%;
+     display:flex;flex-direction:column;overscroll-behavior:none}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:.6rem 1rem;flex:0 0 auto}
+.bar{display:flex;align-items:center;gap:.6rem;max-width:700px;margin:0 auto}
+h1{font-size:1rem;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+select{padding:.4rem .5rem;min-height:40px;border:1px solid var(--border);border-radius:8px;
+       background:var(--surface);color:var(--text);font-size:.9rem;font-family:inherit;max-width:55%}
+a.home{color:var(--muted);text-decoration:none;font-size:.85rem;font-weight:600;white-space:nowrap}
+a.home:hover{color:var(--accent-dark)}
+
+main{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+.deck{display:none;flex:1 1 auto;min-height:0;flex-direction:column}
+.deck.active{display:flex}
+
+.track{flex:1 1 auto;min-height:0;display:flex;overflow-x:auto;overflow-y:hidden;
+       scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.track::-webkit-scrollbar{display:none}
+
+.card{flex:0 0 100%;width:100%;scroll-snap-align:center;scroll-snap-stop:always;
+      padding:1.1rem 1.2rem 1.5rem;overflow-y:auto;display:flex;flex-direction:column}
+.card-inner{max-width:660px;margin:0 auto;width:100%}
+.step-no{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+         color:var(--accent-dark);margin-bottom:.5rem}
+.step-text{font-size:1.22rem;line-height:1.55}
+@media (min-width:640px){ .step-text{font-size:1.3rem} }
+
+ul.ing{list-style:none;margin:.3rem 0 0;padding:0}
+ul.ing li{display:flex;gap:.6rem;padding:.5rem 0;border-bottom:1px solid var(--border);font-size:1.05rem}
+ul.ing li:last-child{border-bottom:none}
+.q{font-weight:700;flex:0 0 auto;min-width:4.5rem}
+.pill{display:inline-block;font-size:.68rem;font-weight:700;text-transform:uppercase;
+      letter-spacing:.03em;padding:.05rem .4rem;border-radius:999px;
+      background:var(--accent-soft);color:var(--accent-dark);border:1px solid var(--border)}
+.meta{color:var(--muted);font-size:.9rem;margin:.2rem 0 1rem}
+h2{font-size:1.3rem;margin:0 0 .4rem}
+
+footer{flex:0 0 auto;background:var(--surface);border-top:1px solid var(--border);padding:.5rem 1rem}
+.nav{display:flex;align-items:center;gap:.6rem;max-width:700px;margin:0 auto}
+.dots{flex:1;display:flex;gap:.3rem;justify-content:center;flex-wrap:wrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--border);transition:background .2s,transform .2s}
+.dot.on{background:var(--accent);transform:scale(1.35)}
+button.nav-btn{min-width:52px;min-height:46px;border:1px solid var(--border);border-radius:10px;
+       background:transparent;color:var(--text);font-size:1.2rem;cursor:pointer;font-family:inherit}
+button.nav-btn:hover:not(:disabled){background:var(--accent-soft);color:var(--accent-dark)}
+button.nav-btn:disabled{opacity:.3;cursor:default}
+.awake{display:flex;align-items:center;gap:.35rem;font-size:.8rem;color:var(--muted);
+       justify-content:center;padding:.35rem 0 0}
+.empty{text-align:center;padding:3rem 1rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1 id="title">Cook</h1>
+    <select id="picker" aria-label="Choose recipe"><option value="0">James Forster</option><option value="1">Korma Baked Salmon and Chips with Garlic Butter Peas, Broccoli and Mango Chutney</option></select>
+    <a class="home" href="./index.html">Shopping&nbsp;&rarr;</a>
+  </div>
+</header>
+
+<main id="main"><div class="deck" data-name="James Forster"><div class="track"><div class="card"><div class="card-inner"><h2>James Forster</h2><p class="meta">30 mins · serves 3</p><ul class="ing"><li><span class="q">2 can</span><span>sweetcorn</span></li></ul></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 1 of 1</div><div class="step-text">Boil this</div></div></div></div></div><div class="deck" data-name="Korma Baked Salmon and Chips with Garlic Butter Peas, Broccoli and Mango Chutney"><div class="track"><div class="card"><div class="card-inner"><h2>Korma Baked Salmon and Chips with Garlic Butter Peas, Broccoli and Mango Chutney</h2><p class="meta">35 mins · serves 3</p><ul class="ing"><li><span class="q">700 g</span><span>Potatoes</span></li><li><span class="q">75 g</span><span>Korma Curry Paste</span></li><li><span class="q">300 g</span><span>Salmon Fillets</span></li><li><span class="q">300 g</span><span>Broccoli Florets</span></li><li><span class="q">60 g</span><span>Mango Chutney</span></li><li><span class="q">2</span><span>Garlic Clove</span></li><li><span class="q">180 g</span><span>Peas</span></li><li><span class="q">3 tbsp</span><span>Mayonnaise <span class="pill">cupboard</span></span></li><li><span class="q">30 g</span><span>Butter <span class="pill">cupboard</span></span></li></ul></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 1 of 6</div><div class="step-text">Preheat your oven to 220°C/200°C fan/gas mark 7. Chop the potatoes lengthways into 1cm slices, then chop into 1cm wide chips (no need to peel). Pop the chips onto a large baking tray. Drizzle with oil, season with salt and pepper, then toss to coat. Spread out in a single layer. TIP: Use two baking trays if necessary. When the oven is hot, roast on the middle shelf until golden, 30-35 mins. Turn halfway through.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 2 of 6</div><div class="step-text">Meanwhile, add the korma curry paste to a medium bowl and season with salt and pepper. Pat the salmon with kitchen paper to remove any excess moisture, then add to the bowl. Use your hands to coat the fish well. Lay the fish, skin-side down, onto one side of a large, lined baking tray. Add the broccoli to the other side of the tray. Drizzle with oil, season with salt and pepper, then toss to coat. Spread out in a single layer. If you&#x27;d prefer to boil your broccoli, boil in step 5 while the peas cook for 3-5 mins, until tender.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 3 of 6</div><div class="step-text">Once the chips have been in the oven for 12 mins, pop the fish and broccoli tray onto the top shelf. Bake until the salmon is cooked and the broccoli is crispy and slightly charred, 10-15 mins. IMPORTANT: Wash your hands and equipment after handling raw fish. It&#x27;s cooked when opaque in the middle.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 4 of 6</div><div class="step-text">Meanwhile, in a small bowl, combine the mango chutney and mayo (see pantry for amount). Set aside. Peel and grate the garlic (or use a garlic press).</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 5 of 6</div><div class="step-text">About 5 mins before the chips are ready, melt the butter (see pantry for amount) in a small frying pan on medium-high heat. Add the peas and stir-fry until piping hot, 2-3 mins. Stir in the garlic and cook for a further 30 secs, then season with salt and pepper and remove from the heat.</div></div></div><div class="card"><div class="card-inner"><div class="step-no">Step 6 of 6</div><div class="step-text">When everything&#x27;s ready, serve the korma salmon with the chips, roasted broccoli and garlic peas alongside. Finish with a dollop of mango chutney mayo.</div></div></div></div></div></main>
+
+<footer>
+  <div class="nav">
+    <button class="nav-btn" id="prev" aria-label="Previous step">&larr;</button>
+    <div class="dots" id="dots"></div>
+    <button class="nav-btn" id="next" aria-label="Next step">&rarr;</button>
+  </div>
+  <label class="awake">
+    <input type="checkbox" id="awake"> Keep screen on while cooking
+  </label>
+</footer>
+
+<script>
+(function () {
+  var decks = Array.prototype.slice.call(document.querySelectorAll('.deck'));
+  if (!decks.length) return;
+
+  var picker = document.getElementById('picker');
+  var title = document.getElementById('title');
+  var dots = document.getElementById('dots');
+  var prev = document.getElementById('prev');
+  var next = document.getElementById('next');
+  var current = 0;
+
+  function deck() { return decks[current]; }
+  function track() { return deck().querySelector('.track'); }
+  function cards() { return deck().querySelectorAll('.card'); }
+
+  function index() {
+    var t = track();
+    // Round to the nearest card rather than truncating, so a part-way
+    // swipe still reports the card you actually landed on.
+    return Math.round(t.scrollLeft / t.clientWidth);
+  }
+
+  function paint() {
+    var i = index(), n = cards().length;
+    dots.innerHTML = '';
+    for (var k = 0; k < n; k++) {
+      var d = document.createElement('div');
+      d.className = 'dot' + (k === i ? ' on' : '');
+      dots.appendChild(d);
+    }
+    prev.disabled = i <= 0;
+    next.disabled = i >= n - 1;
+  }
+
+  function go(delta) {
+    var t = track();
+    t.scrollTo({ left: (index() + delta) * t.clientWidth, behavior: 'smooth' });
+  }
+
+  function show(i) {
+    decks.forEach(function (d, k) { d.classList.toggle('active', k === i); });
+    current = i;
+    title.textContent = decks[i].dataset.name;
+    track().scrollTo({ left: 0 });
+    paint();
+  }
+
+  decks.forEach(function (d) {
+    var t = d.querySelector('.track');
+    var timer;
+    t.addEventListener('scroll', function () {
+      clearTimeout(timer);
+      timer = setTimeout(paint, 60);
+    }, { passive: true });
+  });
+
+  prev.addEventListener('click', function () { go(-1); });
+  next.addEventListener('click', function () { go(1); });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowLeft') go(-1);
+    if (e.key === 'ArrowRight') go(1);
+  });
+
+  if (picker) {
+    picker.addEventListener('change', function () { show(parseInt(picker.value, 10)); });
+  }
+
+  window.addEventListener('resize', paint);
+
+  // Stops the phone locking mid-step. Not supported everywhere, and the lock
+  // is dropped when the tab is hidden, so it's re-acquired on return.
+  var lock = null;
+  var awake = document.getElementById('awake');
+  async function acquire() {
+    try { lock = await navigator.wakeLock.request('screen'); } catch (e) { lock = null; }
+  }
+  if ('wakeLock' in navigator) {
+    awake.addEventListener('change', function () {
+      if (awake.checked) { acquire(); }
+      else if (lock) { lock.release(); lock = null; }
+    });
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible' && awake.checked) acquire();
+    });
+  } else {
+    awake.parentElement.style.display = 'none';
+  }
+
+  show(0);
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(function () {});
+  }
+})();
+</script>
+</body>
+</html>

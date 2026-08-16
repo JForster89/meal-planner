@@ -14,6 +14,8 @@ import re
 
 import requests
 
+import taxonomy
+
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
@@ -132,12 +134,24 @@ def _parse_next_data(html):
         for s in sorted(recipe.get("steps", []), key=lambda s: s.get("index", 0))
     ]
 
+    ingredient_names = [
+        i.get("name", "") for i in recipe.get("ingredients", []) if i.get("name")
+    ]
+
     return {
         "name": name or "Untitled recipe",
         "cooking_time_mins": cooking_time,
         "servings": min(yields),
         "yields": yields,
         "instructions": [s for s in steps if s],
+        "tags": taxonomy.clean_tags(recipe.get("tags")),
+        "cuisines": [
+            c["name"].strip()
+            for c in recipe.get("cuisines", []) or []
+            if c.get("name")
+        ],
+        "protein": taxonomy.detect_protein(ingredient_names),
+        "difficulty": recipe.get("difficulty"),
         "source": "next_data",
     }
 
@@ -187,12 +201,18 @@ def _parse_ld_json(html):
                 if cleaned:
                     instructions.append(cleaned)
 
+            category = item.get("recipeCategory") or []
+            cuisine = item.get("recipeCuisine") or []
             return {
                 "name": (item.get("name") or "Untitled recipe").strip(),
                 "cooking_time_mins": _minutes(item.get("totalTime")),
                 "servings": portions,
                 "yields": {portions: items},
                 "instructions": instructions,
+                "tags": [category] if isinstance(category, str) else list(category),
+                "cuisines": [cuisine] if isinstance(cuisine, str) else list(cuisine),
+                "protein": taxonomy.detect_protein([i["name"] for i in items]),
+                "difficulty": None,
                 "source": "ld_json",
             }
     return None

@@ -120,7 +120,8 @@ def test_publish_route_writes_the_site(client, tmp_path, monkeypatch):
     original = export_static.write_site
     monkeypatch.setattr(
         export_static, "write_site",
-        lambda lines, names=(), out_dir=None: original(lines, names, str(tmp_path)),
+        lambda lines, names=(), out_dir=None, recipes=():
+            original(lines, names, str(tmp_path), recipes),
     )
 
     with client.application.app_context():
@@ -138,3 +139,85 @@ def test_publish_route_writes_the_site(client, tmp_path, monkeypatch):
         page = fh.read()
     assert "Potatoes" in page
     assert "450 g" in page
+
+
+# --- cook page --------------------------------------------------------------
+
+RECIPE = {
+    "name": "Korma Salmon", "portions": 3, "cooking_time_mins": 35,
+    "ingredients": [
+        {"display_quantity": "700 g", "name": "Potatoes", "is_pantry": False},
+        {"display_quantity": "30 g", "name": "Butter", "is_pantry": True},
+    ],
+    "steps": ["Preheat the oven.", "Chop the potatoes.", "Bake for 25 minutes."],
+}
+
+
+def test_cook_page_has_a_card_per_step_plus_ingredients():
+    from export_static import build_cook_page
+    page = build_cook_page([RECIPE])
+    assert page.count('class="card"') == len(RECIPE["steps"]) + 1
+    assert "Step 1 of 3" in page and "Step 3 of 3" in page
+
+
+def test_cook_page_shows_ingredients_and_marks_pantry():
+    from export_static import build_cook_page
+    page = build_cook_page([RECIPE])
+    assert "700 g" in page and "Potatoes" in page
+    assert "cupboard" in page
+
+
+def test_cook_page_picker_only_when_several_recipes():
+    from export_static import build_cook_page
+    assert 'id="picker"' not in build_cook_page([RECIPE])
+    two = build_cook_page([RECIPE, dict(RECIPE, name="Second")])
+    assert 'id="picker"' in two
+    assert two.count('class="deck"') == 2
+
+
+def test_cook_page_handles_missing_method():
+    from export_static import build_cook_page
+    page = build_cook_page([dict(RECIPE, steps=[])])
+    assert "No method saved" in page
+
+
+def test_cook_page_with_nothing_planned():
+    from export_static import build_cook_page
+    assert "Nothing planned" in build_cook_page([])
+
+
+def test_cook_page_escapes_recipe_content():
+    from export_static import build_cook_page
+    page = build_cook_page([dict(RECIPE, name='<img src=x onerror=alert(1)>',
+                                 steps=["<script>bad()</script>"])])
+    assert "<img src=x" not in page
+    assert "<script>bad()</script>" not in page
+    assert "&lt;script&gt;" in page
+
+
+def test_cook_page_is_self_contained():
+    from export_static import build_cook_page
+    page = build_cook_page([RECIPE])
+    for pattern in ['src="http', 'href="http', "cdn."]:
+        assert pattern not in page
+
+
+def test_write_site_emits_cook_page(tmp_path):
+    from export_static import write_site
+    write_site([line("Potatoes")], ["Korma Salmon"], out_dir=str(tmp_path), recipes=[RECIPE])
+    cook = os.path.join(str(tmp_path), "cook.html")
+    assert os.path.exists(cook)
+    with open(cook, encoding="utf-8") as fh:
+        assert "Korma Salmon" in fh.read()
+
+
+def test_service_worker_caches_the_cook_page(tmp_path):
+    from export_static import write_site
+    write_site([line("Potatoes")], out_dir=str(tmp_path), recipes=[RECIPE])
+    with open(os.path.join(str(tmp_path), "sw.js"), encoding="utf-8") as fh:
+        assert "./cook.html" in fh.read()
+
+
+def test_shopping_page_links_to_cook_mode():
+    from export_static import build_page
+    assert './cook.html' in build_page([line("Potatoes")])

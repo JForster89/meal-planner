@@ -65,6 +65,16 @@ CREATE TABLE IF NOT EXISTS shopping_state (
     PRIMARY KEY (plan_id, item_key)
 );
 
+-- Tags, cuisine and derived protein, for grouping and search.
+-- kind is 'tag', 'cuisine' or 'protein'.
+CREATE TABLE IF NOT EXISTS recipe_tags (
+    recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+    tag       TEXT    NOT NULL,
+    kind      TEXT    NOT NULL DEFAULT 'tag',
+    PRIMARY KEY (recipe_id, tag, kind)
+);
+CREATE INDEX IF NOT EXISTS idx_recipe_tags_kind ON recipe_tags(kind, tag);
+
 -- App-wide preferences, e.g. how many people you normally cook for.
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
@@ -254,6 +264,13 @@ def ingredients_for(conn, recipe_id, portions):
     return rows, multiplier
 
 
+def ensure_column(conn, table, column, ddl):
+    """Add a column if it's missing. SQLite has no ADD COLUMN IF NOT EXISTS."""
+    existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if column not in existing:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+
+
 def init_db():
     """Create the schema, migrating the legacy table first if one is present."""
     conn = sqlite3.connect(DB_PATH)
@@ -261,6 +278,9 @@ def init_db():
         conn.execute("PRAGMA foreign_keys = ON")
         migrated = migrate_legacy(conn)
         conn.executescript(SCHEMA)
+        # Columns added after the first release.
+        ensure_column(conn, "recipes", "difficulty", "INTEGER")
+        ensure_column(conn, "recipes", "image_url", "TEXT")
         conn.commit()
         return migrated
     finally:

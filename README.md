@@ -11,6 +11,11 @@ off on your phone in the shop.
 - **One shopping list** that merges ingredients across recipes: 450 g potatoes in
   one meal plus 0.5 kg in another becomes a single `950 g Potatoes` line.
 - **Tick items off** as you shop. State saves instantly and syncs across devices.
+- **Find recipes** by name *or ingredient* — searching "chorizo" finds the pasta
+  dish whose title never mentions it — filtered by tag and grouped by protein or
+  cuisine.
+- **Cook mode** on your phone: swipeable cards, one per step, with the
+  ingredients up front and an option to keep the screen awake.
 - **Cupboard items hidden** by default — HelloFresh flags things like oil, butter
   and salt as "not included in your delivery", so they're filtered out unless asked for.
 
@@ -75,9 +80,26 @@ working in a supermarket dead spot.
 3. `git add docs && git commit -m "shopping list" && git push`
 4. Open `https://<user>.github.io/<repo>/` on your phone, *Add to Home Screen*.
 
+Publishing writes two pages: `index.html` (the shopping list) and `cook.html`
+(a swipeable card deck per planned recipe), linked to each other.
+
 Ticks are stored in the phone's `localStorage`, keyed by ingredient — so
 republishing after adding a recipe keeps everything you'd already ticked. A
-service worker caches the page, so it opens with no signal.
+service worker caches both pages, so they open with no signal.
+
+### How recipes are grouped
+
+HelloFresh publishes tags, a cuisine and a difficulty, but nothing saying "this
+is a chicken dish", so the protein is inferred from the ingredients. Two traps
+that inference has to avoid, both covered by tests:
+
+- **Stocks and seasonings don't count.** A chorizo pasta listing "Chicken Stock
+  Powder" is a pork dish.
+- **Named meats beat generic words.** A bare "mince" only means beef when
+  nothing else identifies the animal, so "Pork Mince" stays pork.
+
+Their tag list also mixes user-facing labels ("High Protein", "Family Friendly")
+with internal ones ("SEO", "classic-plates"); only the useful ones are kept.
 
 The trade-offs, stated plainly: you must publish before leaving the house,
 ticks live on the phone and don't sync back, and GitHub's free plan only serves

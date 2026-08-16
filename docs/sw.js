@@ -1,6 +1,6 @@
 // Cache the list so it opens in a supermarket dead spot.
-var CACHE = 'shopping-20260816212105';
-var ASSETS = ['./', './index.html', './manifest.json', './icon.svg'];
+var CACHE = 'shopping-20260816215646';
+var ASSETS = ['./', './index.html', './cook.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', function (e) {
   self.skipWaiting();

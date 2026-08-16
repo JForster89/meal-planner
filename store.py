@@ -43,7 +43,8 @@ def list_recipes(conn):
 
 def get_recipe(conn, recipe_id, portions=None):
     recipe = conn.execute(
-        "SELECT id, name, cooking_time_mins, servings, source_url FROM recipes WHERE id = ?",
+        "SELECT id, name, cooking_time_mins, servings, source_url, difficulty "
+        "FROM recipes WHERE id = ?",
         (recipe_id,),
     ).fetchone()
     if not recipe:
@@ -62,11 +63,13 @@ def get_recipe(conn, recipe_id, portions=None):
         "cooking_time_mins": recipe["cooking_time_mins"],
         "servings": recipe["servings"],
         "source_url": recipe["source_url"],
+        "difficulty": recipe["difficulty"],
         "portions": portions,
         "multiplier": multiplier,
         "available_yields": available_yields(conn, recipe_id),
         "ingredients": rows,
         "instructions": instructions,
+        "tags": get_tags(conn, recipe_id),
     }
 
 
@@ -127,8 +130,94 @@ def save_recipe(conn, data, recipe_id=None):
             (recipe_id, step, text.strip()),
         )
 
+    conn.execute("UPDATE recipes SET difficulty = ? WHERE id = ?",
+                 (data.get("difficulty"), recipe_id))
+
+    conn.execute("DELETE FROM recipe_tags WHERE recipe_id = ?", (recipe_id,))
+    tagged = [("tag", t) for t in data.get("tags", [])]
+    tagged += [("cuisine", c) for c in data.get("cuisines", [])]
+    if data.get("protein"):
+        tagged.append(("protein", data["protein"]))
+    for kind, tag in tagged:
+        if tag and tag.strip():
+            conn.execute(
+                "INSERT OR IGNORE INTO recipe_tags (recipe_id, tag, kind) VALUES (?, ?, ?)",
+                (recipe_id, tag.strip(), kind),
+            )
+
     conn.commit()
     return recipe_id
+
+
+def get_tags(conn, recipe_id):
+    rows = conn.execute(
+        "SELECT tag, kind FROM recipe_tags WHERE recipe_id = ? ORDER BY kind, tag",
+        (recipe_id,),
+    ).fetchall()
+    return [{"tag": r["tag"], "kind": r["kind"]} for r in rows]
+
+
+def tags_for_recipes(conn, kinds=("tag", "cuisine", "protein")):
+    """{recipe_id: [tags]} in one query, to avoid a lookup per card."""
+    placeholders = ",".join("?" * len(kinds))
+    rows = conn.execute(
+        f"SELECT recipe_id, tag, kind FROM recipe_tags WHERE kind IN ({placeholders}) "
+        "ORDER BY CASE kind WHEN 'protein' THEN 0 WHEN 'cuisine' THEN 1 ELSE 2 END, tag",
+        tuple(kinds),
+    ).fetchall()
+    out = {}
+    for row in rows:
+        out.setdefault(row["recipe_id"], []).append(
+            {"tag": row["tag"], "kind": row["kind"]}
+        )
+    return out
+
+
+def all_tags(conn, kind):
+    rows = conn.execute(
+        "SELECT tag, COUNT(*) AS n FROM recipe_tags WHERE kind = ? "
+        "GROUP BY tag ORDER BY n DESC, tag",
+        (kind,),
+    ).fetchall()
+    return [{"tag": r["tag"], "count": r["n"]} for r in rows]
+
+
+def search_recipes(conn, query=None, tag=None, protein=None):
+    """Filter the library by free text and/or an exact tag.
+
+    Free text matches the recipe name or any of its ingredient names, so
+    "chorizo" finds the pasta dish even though the word isn't in its title.
+    """
+    sql = [
+        "SELECT DISTINCT r.id, r.name, r.cooking_time_mins, r.servings, r.source_url,",
+        "  r.difficulty,",
+        "  (SELECT COUNT(*) FROM ingredients i",
+        "    WHERE i.recipe_id = r.id AND i.yields = r.servings) AS n_ingredients",
+        "FROM recipes r",
+    ]
+    where, params = [], []
+
+    if query:
+        sql.append(
+            "LEFT JOIN ingredients ing ON ing.recipe_id = r.id "
+            "AND ing.yields = r.servings"
+        )
+        where.append("(r.name LIKE ? OR ing.name LIKE ?)")
+        params += [f"%{query}%", f"%{query}%"]
+
+    for value, kind in ((tag, "tag"), (protein, "protein")):
+        if value:
+            where.append(
+                "EXISTS (SELECT 1 FROM recipe_tags rt WHERE rt.recipe_id = r.id "
+                "AND rt.kind = ? AND rt.tag = ?)"
+            )
+            params += [kind, value]
+
+    if where:
+        sql.append("WHERE " + " AND ".join(where))
+    sql.append("ORDER BY r.name COLLATE NOCASE")
+
+    return conn.execute("\n".join(sql), params).fetchall()
 
 
 def delete_recipe(conn, recipe_id):

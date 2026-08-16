@@ -325,6 +325,47 @@ input:focus, textarea:focus, select:focus {
 
 .portion-picker a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
+/* --- filters and tag chips --- */
+
+.filter-card { padding: .8rem 1rem; }
+
+.chips { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .6rem; }
+.chips.tight { margin-top: .4rem; gap: .3rem; }
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .3rem .6rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: .82rem;
+    font-weight: 600;
+    text-decoration: none;
+    min-height: 32px;
+}
+
+.chip:hover { background: var(--accent-soft); color: var(--accent-dark); }
+.chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.chip.on:hover { background: var(--accent-dark); color: #fff; }
+.chip.subtle { font-weight: 500; color: var(--muted); }
+.chip.subtle.on { color: #fff; }
+.chip-n { opacity: .65; font-weight: 500; font-size: .75rem; }
+
+.chip.static {
+    min-height: 24px;
+    padding: .1rem .5rem;
+    font-size: .72rem;
+    font-weight: 600;
+    color: var(--muted);
+    background: transparent;
+}
+
+.chip.static.kind-protein { color: var(--accent-dark); border-color: var(--accent); }
+.chip.static.kind-cuisine { font-style: italic; }
+
 .empty {
     text-align: center;
     padding: 2.5rem 1rem;

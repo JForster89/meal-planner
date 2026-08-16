@@ -98,6 +98,7 @@ h2{font-size:1rem;margin:1.5rem 0 .5rem;color:var(--muted)}
   <ul id="extras"></ul>
 
   <div class="row">
+    <a class="btn" href="./cook.html">Cook mode &rarr;</a>
     <button class="btn" id="reset">Untick all</button>
   </div>
   <p class="meta">Ticks are saved on this device. Works offline once loaded.</p>
@@ -218,7 +219,7 @@ h2{font-size:1rem;margin:1.5rem 0 .5rem;color:var(--muted)}
 
 SERVICE_WORKER = """// Cache the list so it opens in a supermarket dead spot.
 var CACHE = 'shopping-__STAMP__';
-var ASSETS = ['./', './index.html', './manifest.json', './icon.svg'];
+var ASSETS = ['./', './index.html', './cook.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', function (e) {
   self.skipWaiting();
@@ -251,6 +252,204 @@ self.addEventListener('fetch', function (e) {
     })
   );
 });
+"""
+
+COOK_PAGE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#2f7d32">
+<title>Cook</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+:root {
+  --bg:#f6f7f5; --surface:#fff; --border:#e2e5e0; --text:#1c2119;
+  --muted:#6b7280; --accent:#2f7d32; --accent-dark:#24631f; --accent-soft:#eaf4ea;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:#14171a; --surface:#1d2125; --border:#2d3339; --text:#e8eae7;
+    --muted:#9aa3ad; --accent:#5cbf60; --accent-dark:#7bd47f; --accent-soft:#1e2c1f;
+  }
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+     background:var(--bg);color:var(--text);line-height:1.5;-webkit-text-size-adjust:100%;
+     display:flex;flex-direction:column;overscroll-behavior:none}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:.6rem 1rem;flex:0 0 auto}
+.bar{display:flex;align-items:center;gap:.6rem;max-width:700px;margin:0 auto}
+h1{font-size:1rem;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+select{padding:.4rem .5rem;min-height:40px;border:1px solid var(--border);border-radius:8px;
+       background:var(--surface);color:var(--text);font-size:.9rem;font-family:inherit;max-width:55%}
+a.home{color:var(--muted);text-decoration:none;font-size:.85rem;font-weight:600;white-space:nowrap}
+a.home:hover{color:var(--accent-dark)}
+
+main{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+.deck{display:none;flex:1 1 auto;min-height:0;flex-direction:column}
+.deck.active{display:flex}
+
+.track{flex:1 1 auto;min-height:0;display:flex;overflow-x:auto;overflow-y:hidden;
+       scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.track::-webkit-scrollbar{display:none}
+
+.card{flex:0 0 100%;width:100%;scroll-snap-align:center;scroll-snap-stop:always;
+      padding:1.1rem 1.2rem 1.5rem;overflow-y:auto;display:flex;flex-direction:column}
+.card-inner{max-width:660px;margin:0 auto;width:100%}
+.step-no{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+         color:var(--accent-dark);margin-bottom:.5rem}
+.step-text{font-size:1.22rem;line-height:1.55}
+@media (min-width:640px){ .step-text{font-size:1.3rem} }
+
+ul.ing{list-style:none;margin:.3rem 0 0;padding:0}
+ul.ing li{display:flex;gap:.6rem;padding:.5rem 0;border-bottom:1px solid var(--border);font-size:1.05rem}
+ul.ing li:last-child{border-bottom:none}
+.q{font-weight:700;flex:0 0 auto;min-width:4.5rem}
+.pill{display:inline-block;font-size:.68rem;font-weight:700;text-transform:uppercase;
+      letter-spacing:.03em;padding:.05rem .4rem;border-radius:999px;
+      background:var(--accent-soft);color:var(--accent-dark);border:1px solid var(--border)}
+.meta{color:var(--muted);font-size:.9rem;margin:.2rem 0 1rem}
+h2{font-size:1.3rem;margin:0 0 .4rem}
+
+footer{flex:0 0 auto;background:var(--surface);border-top:1px solid var(--border);padding:.5rem 1rem}
+.nav{display:flex;align-items:center;gap:.6rem;max-width:700px;margin:0 auto}
+.dots{flex:1;display:flex;gap:.3rem;justify-content:center;flex-wrap:wrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--border);transition:background .2s,transform .2s}
+.dot.on{background:var(--accent);transform:scale(1.35)}
+button.nav-btn{min-width:52px;min-height:46px;border:1px solid var(--border);border-radius:10px;
+       background:transparent;color:var(--text);font-size:1.2rem;cursor:pointer;font-family:inherit}
+button.nav-btn:hover:not(:disabled){background:var(--accent-soft);color:var(--accent-dark)}
+button.nav-btn:disabled{opacity:.3;cursor:default}
+.awake{display:flex;align-items:center;gap:.35rem;font-size:.8rem;color:var(--muted);
+       justify-content:center;padding:.35rem 0 0}
+.empty{text-align:center;padding:3rem 1rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1 id="title">Cook</h1>
+    __PICKER__
+    <a class="home" href="./index.html">Shopping&nbsp;&rarr;</a>
+  </div>
+</header>
+
+<main id="main">__DECKS__</main>
+
+<footer>
+  <div class="nav">
+    <button class="nav-btn" id="prev" aria-label="Previous step">&larr;</button>
+    <div class="dots" id="dots"></div>
+    <button class="nav-btn" id="next" aria-label="Next step">&rarr;</button>
+  </div>
+  <label class="awake">
+    <input type="checkbox" id="awake"> Keep screen on while cooking
+  </label>
+</footer>
+
+<script>
+(function () {
+  var decks = Array.prototype.slice.call(document.querySelectorAll('.deck'));
+  if (!decks.length) return;
+
+  var picker = document.getElementById('picker');
+  var title = document.getElementById('title');
+  var dots = document.getElementById('dots');
+  var prev = document.getElementById('prev');
+  var next = document.getElementById('next');
+  var current = 0;
+
+  function deck() { return decks[current]; }
+  function track() { return deck().querySelector('.track'); }
+  function cards() { return deck().querySelectorAll('.card'); }
+
+  function index() {
+    var t = track();
+    // Round to the nearest card rather than truncating, so a part-way
+    // swipe still reports the card you actually landed on.
+    return Math.round(t.scrollLeft / t.clientWidth);
+  }
+
+  function paint() {
+    var i = index(), n = cards().length;
+    dots.innerHTML = '';
+    for (var k = 0; k < n; k++) {
+      var d = document.createElement('div');
+      d.className = 'dot' + (k === i ? ' on' : '');
+      dots.appendChild(d);
+    }
+    prev.disabled = i <= 0;
+    next.disabled = i >= n - 1;
+  }
+
+  function go(delta) {
+    var t = track();
+    t.scrollTo({ left: (index() + delta) * t.clientWidth, behavior: 'smooth' });
+  }
+
+  function show(i) {
+    decks.forEach(function (d, k) { d.classList.toggle('active', k === i); });
+    current = i;
+    title.textContent = decks[i].dataset.name;
+    track().scrollTo({ left: 0 });
+    paint();
+  }
+
+  decks.forEach(function (d) {
+    var t = d.querySelector('.track');
+    var timer;
+    t.addEventListener('scroll', function () {
+      clearTimeout(timer);
+      timer = setTimeout(paint, 60);
+    }, { passive: true });
+  });
+
+  prev.addEventListener('click', function () { go(-1); });
+  next.addEventListener('click', function () { go(1); });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowLeft') go(-1);
+    if (e.key === 'ArrowRight') go(1);
+  });
+
+  if (picker) {
+    picker.addEventListener('change', function () { show(parseInt(picker.value, 10)); });
+  }
+
+  window.addEventListener('resize', paint);
+
+  // Stops the phone locking mid-step. Not supported everywhere, and the lock
+  // is dropped when the tab is hidden, so it's re-acquired on return.
+  var lock = null;
+  var awake = document.getElementById('awake');
+  async function acquire() {
+    try { lock = await navigator.wakeLock.request('screen'); } catch (e) { lock = null; }
+  }
+  if ('wakeLock' in navigator) {
+    awake.addEventListener('change', function () {
+      if (awake.checked) { acquire(); }
+      else if (lock) { lock.release(); lock = null; }
+    });
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible' && awake.checked) acquire();
+    });
+  } else {
+    awake.parentElement.style.display = 'none';
+  }
+
+  show(0);
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(function () {});
+  }
+})();
+</script>
+</body>
+</html>
 """
 
 MANIFEST = {
@@ -288,6 +487,79 @@ def render_items(lines):
     return "\n".join(out)
 
 
+def render_cook_decks(recipes):
+    """One deck per recipe: an ingredients card, then a card per step."""
+    if not recipes:
+        return '<div class="empty"><h2>Nothing planned</h2>' \
+               '<p>Plan a week and publish again.</p></div>'
+
+    decks = []
+    for recipe in recipes:
+        name = html.escape(recipe["name"])
+        bits = []
+        if recipe.get("cooking_time_mins"):
+            bits.append(f"{recipe['cooking_time_mins']} mins")
+        bits.append(f"serves {recipe.get('portions', 2)}")
+        meta = html.escape(" · ".join(bits))
+
+        items = []
+        for ing in recipe.get("ingredients", []):
+            qty = html.escape(ing.get("display_quantity") or "")
+            pantry = ' <span class="pill">cupboard</span>' if ing.get("is_pantry") else ""
+            items.append(
+                f'<li><span class="q">{qty}</span>'
+                f'<span>{html.escape(ing["name"])}{pantry}</span></li>'
+            )
+
+        cards = [
+            '<div class="card"><div class="card-inner">'
+            f'<h2>{name}</h2><p class="meta">{meta}</p>'
+            f'<ul class="ing">{"".join(items)}</ul>'
+            "</div></div>"
+        ]
+
+        steps = recipe.get("steps", [])
+        for i, step in enumerate(steps, start=1):
+            cards.append(
+                '<div class="card"><div class="card-inner">'
+                f'<div class="step-no">Step {i} of {len(steps)}</div>'
+                f'<div class="step-text">{html.escape(step)}</div>'
+                "</div></div>"
+            )
+
+        if not steps:
+            cards.append(
+                '<div class="card"><div class="card-inner">'
+                '<div class="step-text">No method saved for this recipe.</div>'
+                "</div></div>"
+            )
+
+        decks.append(
+            f'<div class="deck" data-name="{name}">'
+            f'<div class="track">{"".join(cards)}</div></div>'
+        )
+
+    return "".join(decks)
+
+
+def render_picker(recipes):
+    if len(recipes) < 2:
+        return ""
+    options = "".join(
+        f'<option value="{i}">{html.escape(r["name"])}</option>'
+        for i, r in enumerate(recipes)
+    )
+    return f'<select id="picker" aria-label="Choose recipe">{options}</select>'
+
+
+def build_cook_page(recipes):
+    return (
+        COOK_PAGE
+        .replace("__DECKS__", render_cook_decks(recipes))
+        .replace("__PICKER__", render_picker(recipes))
+    )
+
+
 def build_page(lines, generated_at=None, recipe_names=()):
     generated_at = generated_at or datetime.now()
     stamp = generated_at.strftime("%a %d %b, %H:%M")
@@ -298,13 +570,15 @@ def build_page(lines, generated_at=None, recipe_names=()):
     return PAGE.replace("__ITEMS__", render_items(lines)).replace("__META__", meta)
 
 
-def write_site(lines, recipe_names=(), out_dir=OUT_DIR):
-    """Write index.html, the service worker, manifest and icon into out_dir."""
+def write_site(lines, recipe_names=(), out_dir=OUT_DIR, recipes=()):
+    """Write the shopping list, cook page and PWA plumbing into out_dir."""
     os.makedirs(out_dir, exist_ok=True)
     now = datetime.now()
+    recipes = list(recipes)
 
     files = {
         "index.html": build_page(lines, now, recipe_names),
+        "cook.html": build_cook_page(recipes),
         # A changing cache name makes the service worker fetch the new list.
         "sw.js": SERVICE_WORKER.replace("__STAMP__", now.strftime("%Y%m%d%H%M%S")),
         "manifest.json": json.dumps(MANIFEST, indent=2),
@@ -323,8 +597,40 @@ def write_site(lines, recipe_names=(), out_dir=OUT_DIR):
     return os.path.join(out_dir, "index.html")
 
 
+def collect_planned_recipes(conn, plan_id):
+    """Planned recipes with quantities resolved for the chosen portion count."""
+    import store
+    from aggregate import format_quantity, normalise_unit
+
+    out = []
+    for entry in store.plan_entries(conn, plan_id):
+        recipe = store.get_recipe(conn, entry["recipe_id"], entry["portions"])
+        if not recipe:
+            continue
+
+        ingredients = []
+        for ing in recipe["ingredients"]:
+            unit, factor = normalise_unit(ing["unit"])
+            qty = ing["quantity"]
+            scaled = qty * factor * recipe["multiplier"] if qty is not None else None
+            ingredients.append({
+                "display_quantity": format_quantity(scaled, unit),
+                "name": ing["name"],
+                "is_pantry": bool(ing["is_pantry"]),
+            })
+
+        out.append({
+            "name": recipe["name"],
+            "portions": entry["portions"],
+            "cooking_time_mins": recipe["cooking_time_mins"],
+            "ingredients": ingredients,
+            "steps": [s["text"] for s in recipe["instructions"]],
+        })
+    return out
+
+
 def main():
-    """Render the active plan's shopping list into docs/."""
+    """Render the active plan's shopping list and cook page into docs/."""
     from app import app
     import store
     from db import get_db
@@ -336,9 +642,10 @@ def main():
         plan = store.get_active_plan(conn)
         lines, extras = store.build_shopping_list(conn, plan["id"], include_pantry)
         names = [e["name"] for e in store.plan_entries(conn, plan["id"])]
+        recipes = collect_planned_recipes(conn, plan["id"])
 
-    path = write_site(lines, names)
-    print(f"Wrote {len(lines)} items to {path}")
+    path = write_site(lines, names, recipes=recipes)
+    print(f"Wrote {len(lines)} items and {len(recipes)} cook cards to {path}")
     if not names:
         print("Warning: nothing is planned, so the list is empty.")
     return 0
