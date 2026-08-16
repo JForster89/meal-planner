@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Import Recipe{% endblock %}
+
+{% block content %}
+<h1>Import from HelloFresh</h1>
+
+<p class="muted">Paste the link to any recipe on hellofresh.co.uk. It'll pull in the
+   name, cooking time, method, and the exact quantities for each portion size.</p>
+
+<form method="POST" class="card">
+    <div class="field">
+        <label for="url">Recipe URL</label>
+        <input type="url" id="url" name="url" value="{{ url }}" required
+               placeholder="https://www.hellofresh.co.uk/recipes/..."
+               autocomplete="off" autocapitalize="off" spellcheck="false">
+    </div>
+    <button type="submit" class="btn block">Import recipe</button>
+</form>
+
+<p class="muted">
+    Importing the same URL again refreshes that recipe rather than duplicating it.
+    Not a HelloFresh meal? <a href="{{ url_for('recipe_new') }}">Add it manually</a>.
+</p>
+{% endblock %}

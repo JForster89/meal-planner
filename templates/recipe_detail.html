@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}{{ recipe.name }}{% endblock %}
+
+{% block content %}
+<h1>{{ recipe.name }}</h1>
+
+<p class="muted">
+    {% if recipe.cooking_time_mins %}{{ recipe.cooking_time_mins }} mins &middot; {% endif %}
+    serves {{ recipe.servings }}
+    {% if recipe.source_url %}
+        &middot; <a href="{{ recipe.source_url }}" rel="noopener noreferrer" target="_blank">view on HelloFresh</a>
+    {% endif %}
+</p>
+
+<div class="btn-row">
+    <form method="POST" action="{{ url_for('plan_add', recipe_id=recipe.id) }}">
+        <input type="hidden" name="portions" value="{{ recipe.portions }}">
+        <button type="submit" class="btn">+ Add to this week</button>
+    </form>
+    <a class="btn secondary" href="{{ url_for('recipe_edit', recipe_id=recipe.id) }}">Edit</a>
+    <form method="POST" action="{{ url_for('recipe_delete', recipe_id=recipe.id) }}"
+          onsubmit="return confirm('Delete “{{ recipe.name }}”? This cannot be undone.')">
+        <button type="submit" class="btn danger">Delete</button>
+    </form>
+</div>
+
+{% if recipe.available_yields|length > 1 %}
+    <h2>Portions</h2>
+    <div class="portion-picker">
+        {% for y in recipe.available_yields %}
+            <a href="{{ url_for('recipe_detail', recipe_id=recipe.id, portions=y) }}"
+               class="{{ 'active' if y == recipe.portions }}">{{ y }}</a>
+        {% endfor %}
+        <span class="muted">HelloFresh's own quantities for each size</span>
+    </div>
+{% endif %}
+
+<h2>Ingredients</h2>
+{% if recipe.ingredients %}
+    <ul class="ingredient-list">
+        {% for ing in recipe.ingredients %}
+            <li>
+                {%- set qty = ing.quantity | quantity(ing.unit, recipe.multiplier) -%}
+                {%- if qty %}<strong>{{ qty }}</strong> {% endif -%}
+                {{ ing.name }}
+                {%- if ing.is_pantry %} <span class="pill">cupboard</span>{% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+    {% if recipe.multiplier != 1.0 %}
+        <p class="muted">Scaled from the {{ recipe.available_yields | join('/') }}-portion version,
+           so quantities are approximate.</p>
+    {% endif %}
+{% else %}
+    <p class="muted">No ingredients recorded.</p>
+{% endif %}
+
+{% if recipe.instructions %}
+    <h2>Method</h2>
+    <ol class="step-list">
+        {% for step in recipe.instructions %}
+            <li>{{ step.text }}</li>
+        {% endfor %}
+    </ol>
+{% endif %}
+{% endblock %}

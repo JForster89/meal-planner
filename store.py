@@ -1,0 +1,250 @@
+"""Persistence for recipes, weekly plans and the shopping list."""
+
+from aggregate import aggregate, normalise_name, normalise_unit
+from db import available_yields, ingredients_for, now_iso
+
+
+# --- recipes ----------------------------------------------------------------
+
+def list_recipes(conn):
+    return conn.execute(
+        "SELECT r.id, r.name, r.cooking_time_mins, r.servings, r.source_url, "
+        "       (SELECT COUNT(*) FROM ingredients i "
+        "         WHERE i.recipe_id = r.id AND i.yields = r.servings) AS n_ingredients "
+        "FROM recipes r ORDER BY r.name COLLATE NOCASE"
+    ).fetchall()
+
+
+def get_recipe(conn, recipe_id, portions=None):
+    recipe = conn.execute(
+        "SELECT id, name, cooking_time_mins, servings, source_url FROM recipes WHERE id = ?",
+        (recipe_id,),
+    ).fetchone()
+    if not recipe:
+        return None
+
+    portions = portions or recipe["servings"]
+    rows, multiplier = ingredients_for(conn, recipe_id, portions)
+    instructions = conn.execute(
+        "SELECT step_no, text FROM instructions WHERE recipe_id = ? ORDER BY step_no",
+        (recipe_id,),
+    ).fetchall()
+
+    return {
+        "id": recipe["id"],
+        "name": recipe["name"],
+        "cooking_time_mins": recipe["cooking_time_mins"],
+        "servings": recipe["servings"],
+        "source_url": recipe["source_url"],
+        "portions": portions,
+        "multiplier": multiplier,
+        "available_yields": available_yields(conn, recipe_id),
+        "ingredients": rows,
+        "instructions": instructions,
+    }
+
+
+def find_by_source_url(conn, url):
+    if not url:
+        return None
+    return conn.execute("SELECT id FROM recipes WHERE source_url = ?", (url,)).fetchone()
+
+
+def save_recipe(conn, data, recipe_id=None):
+    """Insert or fully replace a recipe and its ingredients/instructions.
+
+    `data["yields"]` maps a portion count to its ingredient list, so a single
+    recipe can carry HelloFresh's published 2/3/4-portion quantity tables.
+    """
+    name = (data.get("name") or "").strip() or "Untitled recipe"
+    servings = data.get("servings") or 2
+    source_url = data.get("source_url") or None
+
+    if recipe_id:
+        conn.execute(
+            "UPDATE recipes SET name = ?, cooking_time_mins = ?, servings = ?, source_url = ? "
+            "WHERE id = ?",
+            (name, data.get("cooking_time_mins"), servings, source_url, recipe_id),
+        )
+        conn.execute("DELETE FROM ingredients WHERE recipe_id = ?", (recipe_id,))
+        conn.execute("DELETE FROM instructions WHERE recipe_id = ?", (recipe_id,))
+    else:
+        cur = conn.execute(
+            "INSERT INTO recipes (name, cooking_time_mins, servings, source_url, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (name, data.get("cooking_time_mins"), servings, source_url, now_iso()),
+        )
+        recipe_id = cur.lastrowid
+
+    for portions, items in (data.get("yields") or {}).items():
+        for pos, ing in enumerate(items):
+            if not (ing.get("name") or "").strip():
+                continue
+            conn.execute(
+                "INSERT INTO ingredients "
+                "(recipe_id, yields, quantity, unit, name, is_pantry, position) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    recipe_id,
+                    int(portions),
+                    ing.get("quantity"),
+                    (ing.get("unit") or "").strip(),
+                    ing["name"].strip(),
+                    1 if ing.get("is_pantry") else 0,
+                    ing.get("position", pos),
+                ),
+            )
+
+    for step, text in enumerate((t for t in data.get("instructions", []) if t.strip()), start=1):
+        conn.execute(
+            "INSERT INTO instructions (recipe_id, step_no, text) VALUES (?, ?, ?)",
+            (recipe_id, step, text.strip()),
+        )
+
+    conn.commit()
+    return recipe_id
+
+
+def delete_recipe(conn, recipe_id):
+    conn.execute("DELETE FROM recipes WHERE id = ?", (recipe_id,))
+    conn.commit()
+
+
+# --- plans ------------------------------------------------------------------
+
+def get_active_plan(conn):
+    plan = conn.execute(
+        "SELECT id, name, created_at FROM plans WHERE is_active = 1 ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    if plan:
+        return plan
+    cur = conn.execute(
+        "INSERT INTO plans (name, created_at, is_active) VALUES (?, ?, 1)",
+        ("This week", now_iso()),
+    )
+    conn.commit()
+    return conn.execute(
+        "SELECT id, name, created_at FROM plans WHERE id = ?", (cur.lastrowid,)
+    ).fetchone()
+
+
+def plan_entries(conn, plan_id):
+    return conn.execute(
+        "SELECT pr.recipe_id, pr.portions, r.name, r.cooking_time_mins, r.servings "
+        "FROM plan_recipes pr JOIN recipes r ON r.id = pr.recipe_id "
+        "WHERE pr.plan_id = ? ORDER BY r.name COLLATE NOCASE",
+        (plan_id,),
+    ).fetchall()
+
+
+def add_to_plan(conn, plan_id, recipe_id, portions=None):
+    if portions is None:
+        row = conn.execute("SELECT servings FROM recipes WHERE id = ?", (recipe_id,)).fetchone()
+        portions = row["servings"] if row else 2
+    conn.execute(
+        "INSERT INTO plan_recipes (plan_id, recipe_id, portions) VALUES (?, ?, ?) "
+        "ON CONFLICT(plan_id, recipe_id) DO UPDATE SET portions = excluded.portions",
+        (plan_id, recipe_id, portions),
+    )
+    conn.commit()
+
+
+def remove_from_plan(conn, plan_id, recipe_id):
+    conn.execute(
+        "DELETE FROM plan_recipes WHERE plan_id = ? AND recipe_id = ?", (plan_id, recipe_id)
+    )
+    conn.commit()
+
+
+def set_portions(conn, plan_id, recipe_id, portions):
+    conn.execute(
+        "UPDATE plan_recipes SET portions = ? WHERE plan_id = ? AND recipe_id = ?",
+        (portions, plan_id, recipe_id),
+    )
+    conn.commit()
+
+
+def clear_plan(conn, plan_id):
+    conn.execute("DELETE FROM plan_recipes WHERE plan_id = ?", (plan_id,))
+    conn.execute("DELETE FROM shopping_state WHERE plan_id = ?", (plan_id,))
+    conn.commit()
+
+
+# --- shopping list ----------------------------------------------------------
+
+def build_shopping_list(conn, plan_id, include_pantry=False):
+    """Aggregate every planned recipe's ingredients into one tickable list."""
+    rows = []
+    for entry in plan_entries(conn, plan_id):
+        ingredients, multiplier = ingredients_for(conn, entry["recipe_id"], entry["portions"])
+        for ing in ingredients:
+            rows.append(
+                {
+                    "quantity": ing["quantity"],
+                    "unit": ing["unit"],
+                    "name": ing["name"],
+                    "is_pantry": ing["is_pantry"],
+                    "recipe_name": entry["name"],
+                    "multiplier": multiplier,
+                }
+            )
+
+    lines = aggregate(rows, include_pantry=include_pantry)
+
+    checked = {
+        r["item_key"]
+        for r in conn.execute(
+            "SELECT item_key FROM shopping_state WHERE plan_id = ? AND checked = 1", (plan_id,)
+        )
+    }
+    for line in lines:
+        line["checked"] = line["key"] in checked
+
+    extras = conn.execute(
+        "SELECT id, text, checked FROM extra_items WHERE plan_id = ? ORDER BY id", (plan_id,)
+    ).fetchall()
+
+    return lines, extras
+
+
+def set_checked(conn, plan_id, item_key, checked):
+    conn.execute(
+        "INSERT INTO shopping_state (plan_id, item_key, checked) VALUES (?, ?, ?) "
+        "ON CONFLICT(plan_id, item_key) DO UPDATE SET checked = excluded.checked",
+        (plan_id, item_key, 1 if checked else 0),
+    )
+    conn.commit()
+
+
+def uncheck_all(conn, plan_id):
+    conn.execute("UPDATE shopping_state SET checked = 0 WHERE plan_id = ?", (plan_id,))
+    conn.execute("UPDATE extra_items SET checked = 0 WHERE plan_id = ?", (plan_id,))
+    conn.commit()
+
+
+def add_extra(conn, plan_id, text):
+    text = (text or "").strip()
+    if text:
+        conn.execute("INSERT INTO extra_items (plan_id, text) VALUES (?, ?)", (plan_id, text))
+        conn.commit()
+
+
+def set_extra_checked(conn, extra_id, checked):
+    conn.execute("UPDATE extra_items SET checked = ? WHERE id = ?", (1 if checked else 0, extra_id))
+    conn.commit()
+
+
+def delete_extra(conn, extra_id):
+    conn.execute("DELETE FROM extra_items WHERE id = ?", (extra_id,))
+    conn.commit()
+
+
+def shopping_list_as_text(lines, extras):
+    """Plain-text rendering, for sharing the list to a phone or pasting elsewhere."""
+    out = []
+    for line in lines:
+        qty = line["display_quantity"]
+        out.append(f"- {qty} {line['name']}".replace("-  ", "- ") if qty else f"- {line['name']}")
+    for extra in extras:
+        out.append(f"- {extra['text']}")
+    return "\n".join(out)

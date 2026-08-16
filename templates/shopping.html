@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Shopping List{% endblock %}
+
+{% block content %}
+<h1>Shopping list</h1>
+
+{% if lines or extras %}
+    {% set done = total - remaining %}
+    <div class="progress-bar">
+        <div class="progress-track">
+            <div class="progress-fill" id="progress-fill"
+                 style="width: {{ (done / total * 100) if total else 0 }}%"></div>
+        </div>
+        <span class="muted" id="progress-text">{{ done }}/{{ total }}</span>
+    </div>
+
+    <ul class="shopping-list">
+        {% for line in lines %}
+            <li class="{{ 'checked' if line.checked }}" data-key="{{ line.key }}">
+                <label class="item">
+                    <input type="checkbox" {{ 'checked' if line.checked }}
+                           data-key="{{ line.key }}">
+                    <span class="item-text">
+                        {%- if line.display_quantity %}<span class="item-qty">{{ line.display_quantity }}</span> {% endif -%}
+                        <span class="item-name">{{ line.name }}</span>
+                        {%- if line.is_pantry %} <span class="pill">cupboard</span>{% endif %}
+                        <span class="item-for">{{ line.recipes | join(', ') }}</span>
+                    </span>
+                </label>
+            </li>
+        {% endfor %}
+
+        {% for extra in extras %}
+            <li class="{{ 'checked' if extra.checked }}" data-extra="{{ extra.id }}">
+                <label class="item">
+                    <input type="checkbox" {{ 'checked' if extra.checked }}
+                           data-extra="{{ extra.id }}">
+                    <span class="item-text">
+                        <span class="item-name">{{ extra.text }}</span>
+                        <span class="item-for">Added by you</span>
+                    </span>
+                </label>
+            </li>
+        {% endfor %}
+    </ul>
+
+    <h2>Add something else</h2>
+    <form method="POST" action="{{ url_for('shopping_extra') }}" class="card-row">
+        <input type="text" name="text" class="grow" placeholder="Milk, bin bags, …" required>
+        <button type="submit" class="btn">Add</button>
+    </form>
+
+    <div class="btn-row">
+        <a class="btn secondary"
+           href="{{ url_for('shopping', pantry='0' if include_pantry else '1') }}">
+            {{ 'Hide' if include_pantry else 'Show' }} cupboard items
+        </a>
+        <a class="btn secondary" href="{{ url_for('shopping_text', pantry='1' if include_pantry else '0') }}">
+            Plain text
+        </a>
+        <form method="POST" action="{{ url_for('shopping_reset') }}"
+              onsubmit="return confirm('Untick everything?')">
+            <button type="submit" class="btn danger">Untick all</button>
+        </form>
+    </div>
+
+    {% if not include_pantry %}
+        <p class="muted">Cupboard items (oil, butter, salt) are hidden — HelloFresh marks
+           these as things you'd already have.</p>
+    {% endif %}
+{% else %}
+    <div class="empty">
+        <h2>Nothing to buy yet</h2>
+        <p>Add some recipes to this week and their ingredients<br>
+           will be combined into one list here.</p>
+        <a class="btn" href="{{ url_for('index') }}">Plan this week</a>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Tick off without a page reload — reloading loses your scroll position,
+// which is miserable halfway down a list in a shop aisle.
+(function () {
+    const total = {{ total }};
+
+    function updateProgress() {
+        const done = document.querySelectorAll('.shopping-list input:checked').length;
+        const fill = document.getElementById('progress-fill');
+        const text = document.getElementById('progress-text');
+        if (fill) fill.style.width = total ? (done / total * 100) + '%' : '0%';
+        if (text) text.textContent = done + '/' + total;
+    }
+
+    document.querySelectorAll('.shopping-list input[type="checkbox"]').forEach(function (box) {
+        box.addEventListener('change', function () {
+            const li = box.closest('li');
+            li.classList.toggle('checked', box.checked);
+            updateProgress();
+
+            const body = { checked: box.checked };
+            if (box.dataset.extra) body.extra_id = box.dataset.extra;
+            else body.key = box.dataset.key;
+
+            fetch('{{ url_for("shopping_toggle") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            }).catch(function () {
+                // Roll back so the tick never lies about what was saved.
+                box.checked = !box.checked;
+                li.classList.toggle('checked', box.checked);
+                updateProgress();
+                alert('Could not save that — check your connection.');
+            });
+        });
+    });
+})();
+</script>
+{% endblock %}

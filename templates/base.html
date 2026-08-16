@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2f7d32">
+    <title>{% block title %}Meal Planner{% endblock %}</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="icon" href="{{ url_for('static', filename='icon.svg') }}" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon.svg') }}">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Meals">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="site-header">
+    <div class="inner">
+        <a class="brand" href="{{ url_for('index') }}">🥘 Meal Planner</a>
+        <nav>
+            <a href="{{ url_for('index') }}"
+               class="{{ 'active' if request.endpoint == 'index' }}">Week</a>
+            <a href="{{ url_for('recipes') }}"
+               class="{{ 'active' if request.endpoint in ('recipes', 'recipe_detail') }}">Recipes</a>
+            <a href="{{ url_for('shopping') }}"
+               class="{{ 'active' if request.endpoint == 'shopping' }}">Shop</a>
+        </nav>
+    </div>
+</header>
+
+<main>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+</main>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

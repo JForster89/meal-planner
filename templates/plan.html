@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}This Week{% endblock %}
+
+{% block content %}
+<h1>This week</h1>
+
+{% if entries %}
+    <p class="muted">
+        {{ entries|length }} recipe{{ 's' if entries|length != 1 }} planned &middot;
+        {{ item_count }} thing{{ 's' if item_count != 1 }} to buy
+    </p>
+
+    {% for entry in entries %}
+        <div class="card">
+            <div class="card-row">
+                <div class="grow">
+                    <h3><a href="{{ url_for('recipe_detail', recipe_id=entry.recipe_id, portions=entry.portions) }}">{{ entry.name }}</a></h3>
+                    <span class="muted">
+                        {% if entry.cooking_time_mins %}{{ entry.cooking_time_mins }} mins{% else %}Time not set{% endif %}
+                    </span>
+                </div>
+                <form method="POST" action="{{ url_for('plan_portions', recipe_id=entry.recipe_id) }}">
+                    <label class="muted" for="portions-{{ entry.recipe_id }}">Portions</label>
+                    <select id="portions-{{ entry.recipe_id }}" name="portions" onchange="this.form.submit()">
+                        {% for n in [1, 2, 3, 4, 5, 6] %}
+                            <option value="{{ n }}" {{ 'selected' if n == entry.portions }}>{{ n }}</option>
+                        {% endfor %}
+                    </select>
+                </form>
+                <form method="POST" action="{{ url_for('plan_remove', recipe_id=entry.recipe_id) }}">
+                    <button type="submit" class="btn danger small">Remove</button>
+                </form>
+            </div>
+        </div>
+    {% endfor %}
+
+    <div class="btn-row">
+        <a class="btn" href="{{ url_for('shopping') }}">Shopping list &rarr;</a>
+        <a class="btn secondary" href="{{ url_for('recipes') }}">Add another recipe</a>
+        <form method="POST" action="{{ url_for('plan_clear') }}"
+              onsubmit="return confirm('Clear this week\'s plan? Your recipes are kept.')">
+            <button type="submit" class="btn danger">Clear week</button>
+        </form>
+    </div>
+{% else %}
+    <div class="empty">
+        <h2>Nothing planned yet</h2>
+        <p>Import a HelloFresh recipe or pick from your saved ones,<br>
+           then get one combined shopping list.</p>
+        <div class="btn-row" style="justify-content:center">
+            <a class="btn" href="{{ url_for('import_recipe') }}">Import from HelloFresh</a>
+            {% if recipes %}
+                <a class="btn secondary" href="{{ url_for('recipes') }}">Choose from {{ recipes|length }} saved</a>
+            {% else %}
+                <a class="btn secondary" href="{{ url_for('recipe_new') }}">Add one manually</a>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

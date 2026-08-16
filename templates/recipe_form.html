@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if recipe else 'New' }} Recipe{% endblock %}
+
+{% block content %}
+<h1>{{ 'Edit recipe' if recipe else 'New recipe' }}</h1>
+
+{% if recipe and recipe.available_yields | length > 1 %}
+    <div class="flash error">
+        This recipe has HelloFresh quantities for {{ recipe.available_yields | join(', ') }}
+        portions. Saving this form replaces all of them with the single
+        {{ recipe.portions }}-portion list below. Re-import the URL to get them back.
+    </div>
+{% endif %}
+
+<form method="POST">
+    <div class="field">
+        <label for="name">Recipe name</label>
+        <input type="text" id="name" name="name" required
+               value="{{ form.name if form else (recipe.name if recipe else '') }}">
+    </div>
+
+    <div class="field-row">
+        <div class="field">
+            <label for="cooking_time_mins">Cooking time (mins)</label>
+            <input type="number" id="cooking_time_mins" name="cooking_time_mins" min="0"
+                   placeholder="30"
+                   value="{{ form.cooking_time_mins if form else (recipe.cooking_time_mins or '' if recipe else '') }}">
+        </div>
+        <div class="field">
+            <label for="servings">Serves</label>
+            <input type="number" id="servings" name="servings" min="1" required
+                   value="{{ form.servings if form else (recipe.portions if recipe else 2) }}">
+        </div>
+    </div>
+
+    <h2>Ingredients</h2>
+    <p class="muted">Keep quantity and unit in their own boxes — that's what lets
+       amounts add up across recipes on your shopping list.</p>
+
+    <datalist id="units">
+        {% for u in ['g', 'kg', 'ml', 'l', 'tsp', 'tbsp', 'clove', 'can', 'pack', 'bunch', 'slice'] %}
+            <option value="{{ u }}">
+        {% endfor %}
+    </datalist>
+
+    <div id="ingredients">
+        {% for ing in (recipe.ingredients if recipe else []) %}
+            <div class="ingredient-row">
+                <input class="qty" type="text" name="ingredient_quantity[]" placeholder="450"
+                       inputmode="decimal"
+                       value="{{ ing.quantity | quantity_number }}">
+                <input class="unit" type="text" name="ingredient_unit[]" placeholder="g"
+                       list="units" value="{{ ing.unit or '' }}">
+                <input class="name" type="text" name="ingredient_name[]" placeholder="Potatoes"
+                       value="{{ ing.name }}">
+                <input type="hidden" name="ingredient_pantry[]" value="{{ 1 if ing.is_pantry else 0 }}">
+                <label class="pantry-toggle">
+                    <input type="checkbox" {{ 'checked' if ing.is_pantry }}
+                           onchange="this.closest('.ingredient-row').querySelector('input[type=hidden]').value = this.checked ? 1 : 0">
+                    cupboard
+                </label>
+                <button type="button" class="icon-btn" onclick="removeRow(this)" aria-label="Remove">&times;</button>
+            </div>
+        {% else %}
+            <div class="ingredient-row">
+                <input class="qty" type="text" name="ingredient_quantity[]" placeholder="450" inputmode="decimal">
+                <input class="unit" type="text" name="ingredient_unit[]" placeholder="g" list="units">
+                <input class="name" type="text" name="ingredient_name[]" placeholder="Potatoes">
+                <input type="hidden" name="ingredient_pantry[]" value="0">
+                <label class="pantry-toggle">
+                    <input type="checkbox"
+                           onchange="this.closest('.ingredient-row').querySelector('input[type=hidden]').value = this.checked ? 1 : 0">
+                    cupboard
+                </label>
+                <button type="button" class="icon-btn" onclick="removeRow(this)" aria-label="Remove">&times;</button>
+            </div>
+        {% endfor %}
+    </div>
+    <button type="button" class="btn secondary small" onclick="addIngredient()">+ Add ingredient</button>
+
+    <h2>Method</h2>
+    <div id="instructions">
+        {% for step in (recipe.instructions if recipe else []) %}
+            <div class="instruction-row">
+                <textarea name="instruction[]" rows="2"
+                          placeholder="Step {{ loop.index }}">{{ step.text }}</textarea>
+                <button type="button" class="icon-btn" onclick="removeRow(this)" aria-label="Remove">&times;</button>
+            </div>
+        {% else %}
+            <div class="instruction-row">
+                <textarea name="instruction[]" rows="2" placeholder="Step 1"></textarea>
+                <button type="button" class="icon-btn" onclick="removeRow(this)" aria-label="Remove">&times;</button>
+            </div>
+        {% endfor %}
+    </div>
+    <button type="button" class="btn secondary small" onclick="addInstruction()">+ Add step</button>
+
+    <div class="btn-row">
+        <button type="submit" class="btn">{{ 'Save changes' if recipe else 'Save recipe' }}</button>
+        <a class="btn secondary"
+           href="{{ url_for('recipe_detail', recipe_id=recipe.id) if recipe else url_for('recipes') }}">Cancel</a>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function removeRow(button) {
+    const container = button.closest('#ingredients, #instructions');
+    const row = button.closest('.ingredient-row, .instruction-row');
+    // Always leave one row behind, otherwise the form becomes unusable.
+    if (container.children.length > 1) row.remove();
+    else row.querySelectorAll('input:not([type=hidden]), textarea').forEach(function (f) {
+        if (f.type === 'checkbox') f.checked = false; else f.value = '';
+    });
+}
+
+function addIngredient() {
+    const container = document.getElementById('ingredients');
+    const div = document.createElement('div');
+    div.className = 'ingredient-row';
+    div.innerHTML =
+        '<input class="qty" type="text" name="ingredient_quantity[]" placeholder="450" inputmode="decimal">' +
+        '<input class="unit" type="text" name="ingredient_unit[]" placeholder="g" list="units">' +
+        '<input class="name" type="text" name="ingredient_name[]" placeholder="Potatoes">' +
+        '<input type="hidden" name="ingredient_pantry[]" value="0">' +
+        '<label class="pantry-toggle"><input type="checkbox" ' +
+        'onchange="this.closest(\'.ingredient-row\').querySelector(\'input[type=hidden]\').value = this.checked ? 1 : 0">' +
+        ' cupboard</label>' +
+        '<button type="button" class="icon-btn" onclick="removeRow(this)" aria-label="Remove">&times;</button>';
+    container.appendChild(div);
+    div.querySelector('.qty').focus();
+}
+
+function addInstruction() {
+    const container = document.getElementById('instructions');
+    const div = document.createElement('div');
+    div.className = 'instruction-row';
+    div.innerHTML =
+        '<textarea name="instruction[]" rows="2" placeholder="Step ' +
+        (container.children.length + 1) + '"></textarea>' +
+        '<button type="button" class="icon-btn" onclick="removeRow(this)" aria-label="Remove">&times;</button>';
+    container.appendChild(div);
+    div.querySelector('textarea').focus();
+}
+</script>
+{% endblock %}

@@ -1,4 +1,7 @@
 venv/
+# Your recipe data — kept out of git so it doesn't diff on every save.
+# The original pre-migration copy is preserved in the baseline commit.
+recipes.db
 __pycache__/
 *.py[cod]
 .env

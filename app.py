@@ -1,142 +1,306 @@
-import sqlite3
-from flask import Flask, render_template, request, redirect, url_for
+"""Hello Fresh meal planner: pick a week's recipes, get one merged shopping list."""
 
-app = Flask(__name__)
+import os
 
-# Database setup
-def init_db():
-    with sqlite3.connect('recipes.db') as conn:
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS recipes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                cooking_time TEXT,
-                servings INTEGER,
-                ingredients TEXT NOT NULL,
-                instructions TEXT NOT NULL
+from flask import (
+    Flask, Response, flash, g, jsonify, redirect, render_template, request, url_for
+)
+
+import hellofresh
+import store
+from aggregate import format_quantity
+from db import close_db, get_db, init_db
+
+
+def create_app():
+    app = Flask(__name__)
+    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-only-insecure-key")
+    app.teardown_appcontext(close_db)
+
+    @app.template_filter("quantity")
+    def _quantity(qty, unit="", multiplier=1.0):
+        if qty is None:
+            return ""
+        return format_quantity(qty * multiplier, unit or "")
+
+    @app.template_filter("quantity_number")
+    def _quantity_number(qty):
+        """Bare number for form fields: 450.0 -> '450', 0.5 -> '0.5'."""
+        if qty is None:
+            return ""
+        return str(int(qty)) if float(qty).is_integer() else f"{qty:g}"
+
+    with app.app_context():
+        migrated = init_db()
+        if migrated:
+            app.logger.info("Migrated %d recipe(s) from the legacy schema", migrated)
+
+    register_routes(app)
+    return app
+
+
+def register_routes(app):
+
+    @app.route("/")
+    def index():
+        conn = get_db()
+        plan = store.get_active_plan(conn)
+        entries = store.plan_entries(conn, plan["id"])
+        lines, extras = store.build_shopping_list(conn, plan["id"])
+        return render_template(
+            "plan.html",
+            plan=plan,
+            entries=entries,
+            recipes=store.list_recipes(conn),
+            item_count=len(lines) + len(extras),
+        )
+
+    # --- recipe library -----------------------------------------------------
+
+    @app.route("/recipes")
+    def recipes():
+        conn = get_db()
+        plan = store.get_active_plan(conn)
+        planned = {e["recipe_id"] for e in store.plan_entries(conn, plan["id"])}
+        return render_template(
+            "recipes.html", recipes=store.list_recipes(conn), planned=planned
+        )
+
+    @app.route("/recipes/<int:recipe_id>")
+    def recipe_detail(recipe_id):
+        conn = get_db()
+        portions = request.args.get("portions", type=int)
+        recipe = store.get_recipe(conn, recipe_id, portions)
+        if not recipe:
+            return render_template("404.html"), 404
+        return render_template("recipe_detail.html", recipe=recipe)
+
+    @app.route("/recipes/new", methods=["GET", "POST"])
+    def recipe_new():
+        if request.method == "POST":
+            data = _recipe_from_form(request.form)
+            if not data["name"]:
+                flash("Give the recipe a name.", "error")
+                return render_template("recipe_form.html", recipe=None, form=request.form)
+            recipe_id = store.save_recipe(get_db(), data)
+            flash("Recipe saved.", "success")
+            return redirect(url_for("recipe_detail", recipe_id=recipe_id))
+        return render_template("recipe_form.html", recipe=None, form=None)
+
+    @app.route("/recipes/<int:recipe_id>/edit", methods=["GET", "POST"])
+    def recipe_edit(recipe_id):
+        conn = get_db()
+        recipe = store.get_recipe(conn, recipe_id)
+        if not recipe:
+            return render_template("404.html"), 404
+
+        if request.method == "POST":
+            data = _recipe_from_form(request.form)
+            if not data["name"]:
+                flash("Give the recipe a name.", "error")
+                return render_template("recipe_form.html", recipe=recipe, form=request.form)
+            data["source_url"] = recipe["source_url"]
+            store.save_recipe(conn, data, recipe_id=recipe_id)
+            flash("Recipe updated.", "success")
+            return redirect(url_for("recipe_detail", recipe_id=recipe_id))
+
+        return render_template("recipe_form.html", recipe=recipe, form=None)
+
+    @app.route("/recipes/<int:recipe_id>/delete", methods=["POST"])
+    def recipe_delete(recipe_id):
+        store.delete_recipe(get_db(), recipe_id)
+        flash("Recipe deleted.", "success")
+        return redirect(url_for("recipes"))
+
+    # --- import -------------------------------------------------------------
+
+    @app.route("/import", methods=["GET", "POST"])
+    def import_recipe():
+        if request.method == "POST":
+            url = request.form.get("url", "").strip()
+            conn = get_db()
+            try:
+                data = hellofresh.import_recipe(url)
+            except hellofresh.ImportError_ as exc:
+                flash(str(exc), "error")
+                return render_template("import.html", url=url)
+
+            existing = store.find_by_source_url(conn, data["source_url"])
+            recipe_id = store.save_recipe(
+                conn, data, recipe_id=existing["id"] if existing else None
             )
-        ''')
-    conn.close()
+            flash(
+                f"{'Updated' if existing else 'Imported'} “{data['name']}” "
+                f"({len(data['yields'])} portion size"
+                f"{'s' if len(data['yields']) != 1 else ''}).",
+                "success",
+            )
+            return redirect(url_for("recipe_detail", recipe_id=recipe_id))
+        return render_template("import.html", url="")
 
-init_db()
+    # --- weekly plan --------------------------------------------------------
 
-@app.route('/')
-def home():
-    return "Welcome to the Hello Fresh Recipe Manager!"
+    @app.route("/plan/add/<int:recipe_id>", methods=["POST"])
+    def plan_add(recipe_id):
+        conn = get_db()
+        plan = store.get_active_plan(conn)
+        store.add_to_plan(conn, plan["id"], recipe_id, request.form.get("portions", type=int))
+        return redirect(request.referrer or url_for("index"))
 
-@app.route('/recipes')
-def view_recipes():
-    with sqlite3.connect('recipes.db') as conn:
-        cursor = conn.cursor()
-        cursor.execute('SELECT id, name, cooking_time, servings, ingredients, instructions FROM recipes')
-        recipes = [
+    @app.route("/plan/remove/<int:recipe_id>", methods=["POST"])
+    def plan_remove(recipe_id):
+        conn = get_db()
+        plan = store.get_active_plan(conn)
+        store.remove_from_plan(conn, plan["id"], recipe_id)
+        return redirect(request.referrer or url_for("index"))
+
+    @app.route("/plan/portions/<int:recipe_id>", methods=["POST"])
+    def plan_portions(recipe_id):
+        conn = get_db()
+        plan = store.get_active_plan(conn)
+        portions = max(1, request.form.get("portions", type=int) or 2)
+        store.set_portions(conn, plan["id"], recipe_id, portions)
+        return redirect(url_for("index"))
+
+    @app.route("/plan/clear", methods=["POST"])
+    def plan_clear():
+        conn = get_db()
+        plan = store.get_active_plan(conn)
+        store.clear_plan(conn, plan["id"])
+        flash("Week cleared.", "success")
+        return redirect(url_for("index"))
+
+    # --- shopping list ------------------------------------------------------
+
+    @app.route("/shopping")
+    def shopping():
+        conn = get_db()
+        plan = store.get_active_plan(conn)
+        include_pantry = request.args.get("pantry") == "1"
+        lines, extras = store.build_shopping_list(conn, plan["id"], include_pantry)
+        remaining = sum(1 for l in lines if not l["checked"]) + sum(
+            1 for e in extras if not e["checked"]
+        )
+        return render_template(
+            "shopping.html",
+            plan=plan,
+            lines=lines,
+            extras=extras,
+            include_pantry=include_pantry,
+            remaining=remaining,
+            total=len(lines) + len(extras),
+        )
+
+    @app.route("/shopping/toggle", methods=["POST"])
+    def shopping_toggle():
+        conn = get_db()
+        plan = store.get_active_plan(conn)
+        payload = request.get_json(silent=True) or request.form
+        checked = str(payload.get("checked")).lower() in ("1", "true", "on", "yes")
+
+        if payload.get("extra_id"):
+            store.set_extra_checked(conn, int(payload["extra_id"]), checked)
+        else:
+            store.set_checked(conn, plan["id"], payload.get("key", ""), checked)
+
+        if request.is_json:
+            return jsonify({"ok": True})
+        return redirect(url_for("shopping"))
+
+    @app.route("/shopping/extra", methods=["POST"])
+    def shopping_extra():
+        conn = get_db()
+        plan = store.get_active_plan(conn)
+        store.add_extra(conn, plan["id"], request.form.get("text", ""))
+        return redirect(url_for("shopping"))
+
+    @app.route("/shopping/extra/<int:extra_id>/delete", methods=["POST"])
+    def shopping_extra_delete(extra_id):
+        store.delete_extra(get_db(), extra_id)
+        return redirect(url_for("shopping"))
+
+    @app.route("/shopping/reset", methods=["POST"])
+    def shopping_reset():
+        conn = get_db()
+        plan = store.get_active_plan(conn)
+        store.uncheck_all(conn, plan["id"])
+        flash("All items unticked.", "success")
+        return redirect(url_for("shopping"))
+
+    @app.route("/shopping.txt")
+    def shopping_text():
+        conn = get_db()
+        plan = store.get_active_plan(conn)
+        include_pantry = request.args.get("pantry") == "1"
+        lines, extras = store.build_shopping_list(conn, plan["id"], include_pantry)
+        return Response(
+            store.shopping_list_as_text(lines, extras) + "\n",
+            mimetype="text/plain; charset=utf-8",
+        )
+
+    @app.errorhandler(404)
+    def not_found(_exc):
+        return render_template("404.html"), 404
+
+
+def _recipe_from_form(form):
+    """Build a recipe dict from the manual add/edit form.
+
+    The form captures one portion size; imported recipes may hold several.
+    """
+    try:
+        servings = max(1, int(form.get("servings") or 2))
+    except ValueError:
+        servings = 2
+
+    cooking_time = form.get("cooking_time_mins", "").strip()
+    try:
+        cooking_time = int(cooking_time) if cooking_time else None
+    except ValueError:
+        cooking_time = None
+
+    quantities = form.getlist("ingredient_quantity[]")
+    units = form.getlist("ingredient_unit[]")
+    names = form.getlist("ingredient_name[]")
+    # One hidden 0/1 per ingredient row, so the flag stays aligned with its row
+    # even after rows are added or deleted client-side.
+    pantry = form.getlist("ingredient_pantry[]")
+    pantry += ["0"] * (len(names) - len(pantry))
+
+    items = []
+    for pos, (qty_raw, unit, name) in enumerate(zip(quantities, units, names)):
+        if not name.strip():
+            continue
+        try:
+            qty = float(qty_raw.replace(",", ".")) if qty_raw.strip() else None
+        except ValueError:
+            qty = None
+        items.append(
             {
-                "id": row[0],
-                "name": row[1],
-                "cooking_time": row[2],
-                "servings": row[3],
-                "ingredients": row[4].split(';'),
-                "instructions": row[5].split(';')
+                "quantity": qty,
+                "unit": unit.strip(),
+                "name": name.strip(),
+                "is_pantry": pantry[pos] == "1",
+                "position": pos,
             }
-            for row in cursor.fetchall()
-        ]
-    return render_template('recipes.html', recipes=recipes)
+        )
 
-@app.route('/add', methods=['GET', 'POST'])
-def add_recipe():
-    if request.method == 'POST':
-        # Get form data
-        name = request.form['name']
-        cooking_time = request.form.get('cooking_time', '')
-        servings = request.form.get('servings', 1)
-
-        # Process ingredients
-        ingredient_amounts = request.form.getlist('ingredient_amount[]')
-        ingredient_units = request.form.getlist('ingredient_unit[]')
-        ingredient_names = request.form.getlist('ingredient_name[]')
-        ingredients = [
-            f"{amount} {unit} {name}".strip()
-            for amount, unit, name in zip(ingredient_amounts, ingredient_units, ingredient_names)
-            if name
-        ]
-        ingredients_str = ';'.join(ingredients)
-
-        # Process instructions
-        instructions = request.form.getlist('instruction[]')
-        instructions_str = ';'.join(instructions)
-
-        # Insert into the database
-        with sqlite3.connect('recipes.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO recipes (name, cooking_time, servings, ingredients, instructions)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (name, cooking_time, servings, ingredients_str, instructions_str))
-            conn.commit()
-
-        return redirect(url_for('view_recipes'))
-
-    return render_template('add_recipe.html')
-
-@app.route('/edit/<int:id>', methods=['GET', 'POST'])
-def edit_recipe(id):
-    with sqlite3.connect('recipes.db') as conn:
-        cursor = conn.cursor()
-        cursor.execute('SELECT name, cooking_time, servings, ingredients, instructions FROM recipes WHERE id = ?', (id,))
-        recipe = cursor.fetchone()
-
-    if not recipe:
-        return "Recipe not found!", 404
-
-    if request.method == 'POST':
-        name = request.form['name']
-        cooking_time = request.form.get('cooking_time', '')
-        servings = request.form.get('servings', 1)
-
-        # Process ingredients
-        ingredient_amounts = request.form.getlist('ingredient_amount[]')
-        ingredient_units = request.form.getlist('ingredient_unit[]')
-        ingredient_names = request.form.getlist('ingredient_name[]')
-        ingredients = [
-            f"{amount} {unit} {name}".strip()
-            for amount, unit, name in zip(ingredient_amounts, ingredient_units, ingredient_names)
-            if name
-        ]
-        ingredients_str = ';'.join(ingredients)
-
-        # Process instructions
-        instructions = request.form.getlist('instruction[]')
-        instructions_str = ';'.join(instructions)
-
-        with sqlite3.connect('recipes.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                UPDATE recipes
-                SET name = ?, cooking_time = ?, servings = ?, ingredients = ?, instructions = ?
-                WHERE id = ?
-            ''', (name, cooking_time, servings, ingredients_str, instructions_str, id))
-            conn.commit()
-
-        return redirect(url_for('view_recipes'))
-
-    recipe_data = {
-        "id": id,
-        "name": recipe[0],
-        "cooking_time": recipe[1],
-        "servings": recipe[2],
-        "ingredients": recipe[3].split(';'),
-        "instructions": recipe[4].split(';')
+    return {
+        "name": form.get("name", "").strip(),
+        "cooking_time_mins": cooking_time,
+        "servings": servings,
+        "source_url": None,
+        "yields": {servings: items},
+        "instructions": [t for t in form.getlist("instruction[]") if t.strip()],
     }
-    return render_template('edit_recipe.html', recipe=recipe_data)
 
-@app.route('/delete/<int:id>', methods=['GET'])
-def delete_recipe(id):
-    with sqlite3.connect('recipes.db') as conn:
-        cursor = conn.cursor()
-        cursor.execute('DELETE FROM recipes WHERE id = ?', (id,))
-        conn.commit()
-    return redirect(url_for('view_recipes'))
 
-if __name__ == '__main__':
-    app.run(debug=True)
+app = create_app()
+
+
+if __name__ == "__main__":
+    app.run(
+        host=os.environ.get("HOST", "127.0.0.1"),
+        port=int(os.environ.get("PORT", 5000)),
+        debug=os.environ.get("FLASK_DEBUG") == "1",
+    )

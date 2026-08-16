@@ -1,0 +1,18 @@
+{
+  "name": "Meal Planner",
+  "short_name": "Meals",
+  "description": "Plan the week's recipes and get one combined shopping list.",
+  "start_url": "/shopping",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f7f5",
+  "theme_color": "#2f7d32",
+  "icons": [
+    {
+      "src": "/static/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

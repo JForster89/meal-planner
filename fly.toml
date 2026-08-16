@@ -1,0 +1,24 @@
+# Fly.io deployment. Rename `app` to something unique before first deploy.
+app = "hello-fresh-planner"
+primary_region = "lhr"
+
+[build]
+
+[env]
+  RECIPES_DB = "/data/recipes.db"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  # Scaling to zero is fine for one user: it wakes on the first request.
+  min_machines_running = 0
+
+[[mounts]]
+  source = "recipes_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

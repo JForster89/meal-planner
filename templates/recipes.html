@@ -1,241 +1,45 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Recipe Collection</title>
-    <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f9f8f6;
-        }
-        .container {
-            max-width: 1000px;
-            margin: 50px auto;
-            padding: 20px;
-        }
-        h1 {
-            text-align: center;
-            color: #333;
-        }
-        .add-btn {
-            display: inline-block;
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            text-decoration: none;
-            font-size: 16px;
-            margin-bottom: 20px;
-        }
-        .add-btn:hover {
-            background-color: #45a049;
-        }
-        .recipe-card {
-            background: #fff;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            justify-content: center;
-            align-items: center;
-        }
-        .modal-content {
-            background: #fff;
-            border-radius: 10px;
-            padding: 20px;
-            max-width: 600px;
-            width: 90%;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-            overflow: hidden;
-        }
-        .close-btn {
-            float: right;
-            font-size: 20px;
-            font-weight: bold;
-            cursor: pointer;
-            color: #333;
-        }
-        .close-btn:hover {
-            color: #000;
-        }
-        form {
-            margin-top: 10px;
-        }
-        label {
-            font-weight: bold;
-            margin-bottom: 5px;
-            display: block;
-            color: #555;
-        }
-        input, textarea {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 16px;
-            box-sizing: border-box;
-        }
-        .inline-input {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-        .inline-input input {
-            flex: 1;
-            padding: 10px;
-            margin: 0;
-            box-sizing: border-box;
-        }
-        .remove-btn {
-            background-color: #e74c3c;
-            color: white;
-            padding: 5px 10px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        .remove-btn:hover {
-            background-color: #c0392b;
-        }
-        .form-section {
-            margin-bottom: 20px;
-        }
-        .form-section h3 {
-            font-size: 18px;
-            margin-bottom: 10px;
-            color: #333;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 5px;
-        }
-        .add-btn, .save-btn {
-            display: inline-block;
-            margin-top: 10px;
-            padding: 10px 20px;
-            font-size: 14px;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        .add-btn {
-            background-color: #4CAF50;
-            color: #fff;
-            margin-right: 10px;
-        }
-        .add-btn:hover {
-            background-color: #45a049;
-        }
-        .save-btn {
-            background-color: #28a745;
-            color: #fff;
-        }
-        .save-btn:hover {
-            background-color: #218838;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>My Recipe Collection</h1>
-        <button class="add-btn" onclick="openModal()">+ Add Recipe</button>
-        <div class="recipe-card">
-            <h2>Example Recipe</h2>
-            <p>Cooking Time: 30 mins | Servings: 2</p>
-            <button>Select Recipe</button>
+{% extends "base.html" %}
+{% block title %}Recipes{% endblock %}
+
+{% block content %}
+<h1>Recipes</h1>
+
+<div class="btn-row">
+    <a class="btn" href="{{ url_for('import_recipe') }}">Import from HelloFresh</a>
+    <a class="btn secondary" href="{{ url_for('recipe_new') }}">Add manually</a>
+</div>
+
+{% if recipes %}
+    {% for recipe in recipes %}
+        <div class="card">
+            <div class="card-row">
+                <div class="grow">
+                    <h3><a href="{{ url_for('recipe_detail', recipe_id=recipe.id) }}">{{ recipe.name }}</a></h3>
+                    <span class="muted">
+                        {% if recipe.cooking_time_mins %}{{ recipe.cooking_time_mins }} mins &middot; {% endif %}
+                        serves {{ recipe.servings }} &middot;
+                        {{ recipe.n_ingredients }} ingredient{{ 's' if recipe.n_ingredients != 1 }}
+                        {% if recipe.source_url %} &middot; <span class="pill">HelloFresh</span>{% endif %}
+                    </span>
+                </div>
+                {% if recipe.id in planned %}
+                    <form method="POST" action="{{ url_for('plan_remove', recipe_id=recipe.id) }}">
+                        <button type="submit" class="btn secondary small">✓ In this week</button>
+                    </form>
+                {% else %}
+                    <form method="POST" action="{{ url_for('plan_add', recipe_id=recipe.id) }}">
+                        <button type="submit" class="btn small">+ Add to week</button>
+                    </form>
+                {% endif %}
+            </div>
         </div>
-        <!-- More Recipe Cards -->
+    {% endfor %}
+{% else %}
+    <div class="empty">
+        <h2>No recipes yet</h2>
+        <p>Paste a HelloFresh recipe link and it'll pull in the<br>
+           ingredients, quantities and method automatically.</p>
+        <a class="btn" href="{{ url_for('import_recipe') }}">Import your first recipe</a>
     </div>
-    <!-- Modal -->
-    <div id="recipeModal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn" onclick="closeModal()">&times;</span>
-            <h2>Add New Recipe</h2>
-            <form method="POST">
-                <label for="name">Recipe Title</label>
-                <input type="text" id="name" name="name" placeholder="Recipe Title" required>
-                
-                <div class="inline-input">
-                    <div>
-                        <label for="cooking_time">Cooking Time (mins)</label>
-                        <input type="number" id="cooking_time" name="cooking_time" placeholder="30">
-                    </div>
-                    <div>
-                        <label for="servings">Servings</label>
-                        <input type="number" id="servings" name="servings" placeholder="2" min="1" required>
-                    </div>
-                </div>
-                
-                <label>Ingredients</label>
-                <div id="ingredients-container">
-                    <div class="inline-input">
-                        <input type="text" name="ingredient_amount[]" placeholder="Amount">
-                        <input type="text" name="ingredient_unit[]" placeholder="Unit">
-                        <input type="text" name="ingredient_name[]" placeholder="Ingredient Name">
-                        <button type="button" class="remove-btn" onclick="removeElement(this)">Remove</button>
-                    </div>
-                </div>
-                <button type="button" class="add-btn" onclick="addIngredient()">+ Add Ingredient</button>
-                
-                <label>Instructions</label>
-                <div id="instructions-container">
-                    <div class="inline-step">
-                        <textarea name="instruction[]" rows="2" placeholder="Step 1"></textarea>
-                        <button type="button" class="remove-btn" onclick="removeElement(this)">Remove</button>
-                    </div>
-                </div>
-                <button type="button" class="add-btn" onclick="addInstruction()">+ Add Step</button>
-                
-                <button type="submit" class="save-btn">Save Recipe</button>
-            </form>
-        </div>
-    </div>
-    <script>
-        function openModal() {
-            document.getElementById('recipeModal').style.display = 'flex';
-        }
-        function closeModal() {
-            document.getElementById('recipeModal').style.display = 'none';
-        }
-        function addIngredient() {
-            const container = document.getElementById('ingredients-container');
-            const div = document.createElement('div');
-            div.classList.add('inline-input');
-            div.innerHTML = `
-                <input type="text" name="ingredient_amount[]" placeholder="Amount">
-                <input type="text" name="ingredient_unit[]" placeholder="Unit">
-                <input type="text" name="ingredient_name[]" placeholder="Ingredient Name">
-                <button type="button" class="remove-btn" onclick="removeElement(this)">Remove</button>
-            `;
-            container.appendChild(div);
-        }
-        function addInstruction() {
-            const container = document.getElementById('instructions-container');
-            const div = document.createElement('div');
-            div.classList.add('inline-step');
-            div.innerHTML = `
-                <textarea name="instruction[]" rows="2" placeholder="Step ${container.children.length + 1}"></textarea>
-                <button type="button" class="remove-btn" onclick="removeElement(this)">Remove</button>
-            `;
-            container.appendChild(div);
-        }
-        function removeElement(button) {
-            button.parentElement.remove();
-        }
-    </script>
-</body>
-</html>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Not Found{% endblock %}
+
+{% block content %}
+<div class="empty">
+    <h1>Not found</h1>
+    <p>That page or recipe doesn't exist.</p>
+    <a class="btn" href="{{ url_for('index') }}">Back to this week</a>
+</div>
+{% endblock %}
